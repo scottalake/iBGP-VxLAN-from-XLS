@@ -1,0 +1,48 @@
+---
+- name: Add checkpoint
+  hosts: [leaf,bleaf,bgw,spine]
+  connection: local
+  gather_facts: no
+  roles:
+    - common
+
+  tasks:
+  - name: Check for directories to store generated variables.
+    stat:
+      path: host_vars/{{inventory_hostname}}/generated_underlay_variables.yml
+    register: file_present
+
+  - debug:
+      msg: "File is already there"
+    when:  file_present.stat.exists
+
+  - file: path=host_vars/{{inventory_hostname}}/generated_underlay_variables.yml state=absent
+    when: file_present.stat.exists
+
+  - name: Check for directories to store generated variables.
+    stat:
+      path: host_vars/{{inventory_hostname}}/generated_underlay_variables.yml
+    register: file_present
+
+  - debug:
+      msg: "File deleted successfully"
+    when:  not file_present.stat.exists
+
+ 
+
+  # - name: Check for directories to store generated variables.
+  #   stat:
+  #     path: host_vars/{{inventory_hostname}}
+  #   register: directory_present
+
+  # - debug:
+  #     msg: "Directory not present for this host's generated variables.  Directory will be created"
+  #   when: not directory_present.stat.exists
+
+  # - name: Create directories for generated variables as needed. 
+  #   file:
+  #     path: host_vars/{{inventory_hostname}}
+  #     state: directory
+  #     mode: "u=rw,g=wx,o=rwx"
+  #   when: not directory_present.stat.exists
+

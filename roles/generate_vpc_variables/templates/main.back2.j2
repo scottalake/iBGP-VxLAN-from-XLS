@@ -1,0 +1,200 @@
+{% set leafs = groups['leaf'] + groups['bleaf'] %}
+{#
+General VPC Strategy
+In the topology we have identified the vpc pairs as well as the vpc interfaces in use.  
+Not seen anywhere are the kal interfaces
+We can add a data structure to the topology file
+vpc_kal_interface:
+  n9k-leaf-01:
+  - Ethernet 1/9
+  n9k-leaf-02
+  - Ethernet 1/9
+Why aren't we creating a data structure like this
+vpc_pairs:
+  0:
+    - n9k-leaf-01:
+        vpc_interface1: Ethernet1/7
+        vpc_interface2: Ethernet1/8
+        kal_interface: Ethernet1/9
+    - n9k-leaf-02:
+        vpc_interface1: Ethernet1/7
+        vpc_interface2: Ethernet1/8
+        kal_interface: Ethernet1/9
+  1:
+    - n9k-leaf-03:
+        vpc_interface1: Ethernet1/7
+        vpc_interface2: Ethernet1/8
+        kal_interface: Ethernet1/9
+    - n9k-leaf-04:
+        vpc_interface1: Ethernet1/7
+        vpc_interface2: Ethernet1/8
+        kal_interface: Ethernet1/9
+
+One idea down the road is to develop a single vpc structure for each host.
+The hosts would be tied together by naming the vpc peer in the structure.
+
+Here is the structure we're working with:
+vpc_pairs:
+  0:
+  - n9k-leaf-01
+  - n9k-leaf-02
+  1:
+  - n9k-leaf-03
+  - n9k-leaf-04
+vpc_interfaces:
+  n9k-leaf-01:
+  - Eth1/7
+  - Eth1/8
+  n9k-leaf-02:
+  - Eth1/7
+  - Eth1/8
+  n9k-leaf-03:
+  - Eth1/7
+  - Eth1/8
+  n9k-leaf-04:
+  - Eth1/7
+  - Eth1/8
+What we need to get from this is to select the kal subnet as well as assign the ip out of that subnet.
+vpc_link:
+  0: { 0: { "ip": 192.168.168.1, "mask": 30 },   1: { "ip": 192.168.168.2, "mask": 30 } }
+  1: { 0: { "ip": 192.168.168.5, "mask": 30 },   1: { "ip": 192.168.168.6, "mask": 30 } }
+The programmer's idea was to first figure out a structure that would deliver a subnet for a pair of 
+vpc switches and then assign one of the ip's to each switch.  Thus, we need to identify all vpc
+pairs and put them in a structure and then create a sub-structure where each peer can be identified 
+and assigned an ip address out of the pool assigned to that peer pair
+The vpc_pairs structure gives us that and now we need to build the logic to extract those values.
+To review then
+vpc_pairs is the name of a dictionary with a value of multiple nested dictionaries called peers
+How to get to a nested peer dictionary:  vpc_pairs.peer
+How to get to an interface in a peer:  vpc_pairs.peer[0]
+The peers key has a list for a value
+First it's important to understand how this syntax works: {% for id, peer in vpc_pairs.iteritems() %}
+If the goal is to access information in the vpc_pairs dictionary, the for-loop is built on iteritems()
+When we are looping thorught the vpc_pairs dictionary, the first iterator is the id of the pair
+instance and peer is the name of the list under each id. So the iteration through that data structure
+goes like this:
+0, n9k-leaf-01
+0, n9k-leaf-02
+1, n9k-leaf-03
+1, n9k-leaf-04
+To get to the id, we just loop though the id's and not go deeper
+To get to the peers in each id, we will need to access the list elements.
+
+#}
+{#
+#}
+{#
+#}
+{#
+#}
+{#
+#}
+{% for id, peer in vpc_pairs.iteritems() %}
+{%    if inventory_hostname in peer %}
+{#
+The first piece of the logic goes like this:
+>> loop though the vpc_pairs dictionary and stop when the peer matches the current host
+we're processing.  So if the current inventory_hostname is n9k-leaf-01, we will loop 
+through the dictionary like this: 
+0, n9k-leaf-01      << Not a match
+0, n9k-leaf-02      << Not a match
+1, n9k-leaf-03      << A match
+1, n9k-leaf-04      << Not processed
+#}
+{%       if inventory_hostname in leafs %}
+{#
+Why is it important that we check if the host name is a leaf?  Presumably only leafs
+would be in the list of vpc_pairs.  We don't have an answer here.
+#}
+{%          set vpcid = id %}
+{#
+Here we are assigning the value of the iterator to a variable that can be used to 
+access nested data. The vpcid is the number of the vpc pair and that number will be
+used to pull an vpc kal ip subnet from the vpc_link table
+#}
+{%          set index = peer|length %}
+{#
+The programmer is using the variable index to abstract the number of peers in the peer list under each vpc_pair.
+Also don't understand the logic here as the value of index will always be 2 if all vpc_pairs have (2) switches.
+#}
+vpc:
+  domain: {{ vpc.domain }} 
+  priority: {{ vpc.priority }}
+  system_priority: {{ vpc.system_priority }}
+  po_id: {{ vpc.po_id }}
+  po_mode: {{ vpc.po_mode }}
+  vrf: {{ vpc.vrf }}
+  peer_gw: {{ vpc.peer_gw }}
+  auto_recovery: {{ vpc.auto_recovery }}
+  delay_restore: {{ vpc.delay_restore }}
+{%          for pointer in range(0,index) %}
+{#
+The programmer uses the word pointer for the iterator in this for-loop.  Since the index has a value of 2
+the values for pointer will be [0,1]
+#}
+{%              if peer[pointer] == inventory_hostname %} 
+{#
+Since we're already in the id,peer for-loop on a particular id, "0", for example
+we can directly access the list elements in the peer list under the id "0".
+So to access the first member of the peer list, the syntax is peer[element].  
+
+What we're doing here is looping throught he peer list and finding out which element matches the 
+inventory_hostname we're currently on.  Presumably that element number will be extracted and used
+to identify the ip address to be used out of the assigned vpc_link
+
+Side note:  Need to fully understand how to access nested data.  The first for-loop iterates on id and peer.  
+The second for-loop statement iterates on elements in the peer list.  Remember, we need to 
+understand the data structure if the value in the current key,value pair.  So if the current key,value
+pair is id,peer.  It is important to understand that peer is a list and we need to access list elements.
+
+#}
+{#
+In the following section, we don't understand why the programmer is pulling the ip axc`
+#}
+
+{#
+  vpc_src: {{ lookup('pipe', "cat /etc/hosts | grep " + inventory_hostname + " | awk '{print $1}'") }} 
+{%              else %} 
+  vpc_dst: {{ lookup('pipe', "cat /etc/hosts | grep " + peer[pointer] + " | awk '{print $1}'") }}
+  vpc_peer: {{ peer[pointer] }}
+{%              endif %}
+{%          endfor %}
+#}
+{%          for pointer in range(0,index) %}
+{#
+Pointer in this for-loop is being used to access specific list elements.  
+Note that this iteration is a nested iteration of ID's. We're now in a specific ID.
+So the ID we're currently in, we will iterate through the list elements.
+in the first iteration, "pointer" will be [0] and the accessed element will be n9k-leaf-01.
+In the second iteration, "pointer" will be [1] and the accessed element will be n9k-leaf-02.
+
+#}
+{%             if peer[pointer] == inventory_hostname %}
+  vpc_src: {{ vpc_link[vpcid][pointer]["ip"] }}
+{%             else %}
+  vpc_dest: {{ vpc_link[vpcid][pointer]["ip"] }}
+  vpc_peer: {{ peer[pointer] }}
+{%             endif %}
+{%          endfor %}
+  vlan: {{ vpc.vlan }}
+{%          for pointer in range(0,index) %}
+{%             if peer[pointer] == inventory_hostname %}
+  vlan_underlay_ipv4: {{ vpc_link[vpcid][pointer]["ip"] }}
+  vlan_underlay_mask: {{ vpc_link[vpcid][pointer]["mask"] }}                                                        
+{%             endif %}
+{%          endfor %}
+  vpc_interfaces:
+{%          for vpc_interfaces in vpc_interfaces[inventory_hostname] %}
+{#
+    - {{ vpc_interfaces|replace("Eth", "Ethernet") }}
+#}
+    - {{ vpc_interfaces }}
+{%          endfor %}
+  nve_loopbacks:
+    - interface: {{ underlay["nve_loopbacks"][0]["interface"] }}
+      ipaddress_secondary: {{ vtep_anycast[vpcid]["ip"] }}
+      mask: {{ vtep_anycast[vpcid]["mask"] }}
+{%       endif %}
+{%    endif %}
+{% endfor %}
+

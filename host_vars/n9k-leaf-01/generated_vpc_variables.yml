@@ -1,0 +1,39 @@
+
+
+vpc:
+  domain: 1000 
+  priority: 100
+  system_priority:  100
+  po_id: 4096
+  po_mode: active
+  vrf: vpckeepalive
+  peer_gw: True
+  auto_recovery: True
+  delay_restore: 150
+ 
+  vpc_src: 192.168.168.1
+  vpc_dst: 192.168.168.2
+  vpc_peer: n9k-leaf-02
+  vlan: 123
+  vlan_underlay_ipv4: 192.168.168.1
+  vlan_underlay_mask: 30                                                        
+  vpc_interfaces:
+    - name: Ethernet2/1
+      description: vPC Link Member to n9k-leaf-02 Ethernet2/1
+      enabled: true
+      mode: layer2
+    - name: Ethernet2/2
+      description: vPC Link Member to n9k-leaf-02 Ethernet2/2
+      enabled: true
+      mode: layer2
+  vpc_lag_interfaces:
+    - name: port-channel4096
+      members:
+        - member: Ethernet2/1
+          mode: active
+        - member: Ethernet2/2
+          mode: active
+  nve_loopbacks:
+    - interface: Loopback1
+      ipaddress_secondary: 10.154.154.0
+      mask: 32

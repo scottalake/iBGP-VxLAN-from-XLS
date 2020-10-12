@@ -1,0 +1,31 @@
+---
+topology_file: ./topology.yml
+# target NXOS details
+file_name: nxos.9.2.2.bin
+kickstart: 9.2(2)
+folder: /tftpboot/poap/images
+md5: f8f2f7c2db12178d73dbe5c00072630e
+
+testing:
+  new_interfaces:
+    - name: Ethernet1/6
+      enabled: true
+      mtu: '9216'
+    - name: Ethernet1/34
+      description: to_n9k-leaf-01_ethernet1/34
+      enabled: true
+      mtu: 9216
+      mode: layer3
+    - name: Loopback44
+      enabled: true
+  new_l3_interfaces:
+    - name: Ethernet1/6
+      ipv4: 
+        - address: 10.10.252.0/31
+    - name: Ethernet1/34
+      ipv4:
+        - address: 99.99.99.1/30
+    - name: Loopback44
+      ipv4:
+        - address: 100.0.0.1/32
+...

@@ -1,0 +1,14 @@
+---
+- name: Check to see if legacy files exist and delete if necessary.
+  stat:
+    path: host_vars/{{inventory_hostname}}/generated_overlay_variables.yml
+  register: file_present
+
+- file: path=host_vars/{{inventory_hostname}}/generated_overlay_variables.yml state=absent
+  when: file_present.stat.exists
+
+- name: Generate Overlay variables
+  template: >
+    src=main.j2
+    dest=host_vars/{{inventory_hostname}}/generated_overlay_variables.yml
+#  run_once: true

@@ -1,0 +1,24 @@
+---
+- name: Enable and configure telemetry
+  hosts: all
+  connection: local
+  gather_facts: no
+  tasks:
+  - name: Import host-specific facts from a XLS file
+    xls_to_facts:
+      src: "Scott_EVPN_Config_Template.xlsx" 
+
+  - name: Check to see if legacy files exist and delete if necessary.
+    stat:
+      path: topology.yml
+    register: file_present
+
+  - file: path=topology.yml state=absent
+    when: file_present.stat.exists
+
+  - block:
+    - name: Generate List of Nodes
+      template: >
+        src=xls_to_facts_full_template.j2
+        dest=topology.yml
+    run_once: true

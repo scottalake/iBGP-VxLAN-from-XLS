@@ -1,0 +1,309 @@
+---
+- name: Configure Underlay
+  hosts: [leaf,bleaf,bgw,spine]
+  connection: local
+  gather_facts: no
+  roles:
+    - common
+    #- configure_loopbacks
+  vars:
+    playbook_name: "Configure infrastructure underlay"
+  tasks:
+    # - name: Create checkpoint
+    #   nxos_rollback:
+    #     checkpoint_file: checkpoint.cfg
+    #   tags:
+    #     - create_checkpoint
+
+    - block:
+#############################################################
+#  Enable the ospf process
+#############################################################
+      - name: Configure OSPF Underlay process
+        nxos_ospf:
+          ospf: "{{ underlay['ospf']['process'] }}"
+          state: present
+        tags:
+          - configure_ospf_underlay_process
+          - ospf
+      - name: Configure OSPF Underlay parameters
+        nxos_ospf_vrf:
+          ospf: "{{ underlay['ospf']['process'] }}"
+          vrf: default
+          state: present
+          log_adjacency: detail
+          passive_interface: false
+        #   router_id: "{% if item['interface'] == underlay['ospf']['routerid'] %} {{ item['ipaddress'] }} {% else %} 1.1.1.1 {% endif %}"
+        # with_items: "{{ underlay['loopbacks'] }}"
+          router_id: "{% if item['name'] == underlay['ospf']['routerid'] %} {{ item['ipv4'][0]['address'] | ipaddr('network') }} {% else %} 1.1.1.1 {% endif %}"
+        with_items: "{{ underlay['loopbacks_l3_v2'] }}"
+        tags:
+          - configure_ospf_underlay_parameters
+          - ospf
+
+#############################################################
+#  Enable and configure interfaces
+#############################################################
+
+    - name: Set base interface configuration for loopbacks
+      nxos_interfaces:
+        config: "{{ underlay['loopbacks_v2'] }}" 
+        state: replaced
+      tags:
+      - loopbacks
+
+    - name: Set base interface configuration for NVE loopbacks
+      nxos_interfaces:
+        config: "{{ underlay['nve_loopbacks_v2'] }}" 
+        state: replaced
+      when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+      tags:
+      - loopbacks
+
+    - name: Set base interface configuration for p2p connections
+      nxos_interfaces:
+        config: "{{ underlay['interfaces_v2'] }}" 
+        state: replaced
+      tags:
+      - p2p_interfaces
+
+#############################################################
+#  Configure L3 on Interfaces
+#############################################################
+
+#############################################################
+#  Testing
+#############################################################
+
+
+    # - name: Merge provided configuration with device configuration
+    #   nxos_interfaces:
+    #     config:
+    #       - name: Ethernet1/6
+    #         description: 'Configured by Ansible'
+    #         enabled: True
+    #     state: merged
+
+    # - name: Merge provided configuration with device configuration.
+    #   nxos_l3_interfaces:
+    #     config:
+    #       - name: Ethernet1/6
+    #         ipv4:
+    #           - address: 192.168.1.1/24
+    #             tag: 5
+    #           - address: 10.1.1.1/24
+    #             secondary: True
+    #             tag: 10
+    #     state: merged
+
+#############################################################
+#  More Testing
+#############################################################
+
+    - name: Set base interface configuration (test scenario)
+      nxos_interfaces:
+#        config: "{{ new_interfaces }}"
+        config: "{{ testing['new_interfaces'] }}" 
+        state: merged
+      tags: interfaces
+
+    - name: Configure Layer3 interface addressing (test scenario)
+      nxos_l3_interfaces:
+        config: "{{ testing['new_l3_interfaces'] }}" 
+#        config: "{{ new_l3_interfaces }}"
+        state: merged
+      tags: l3_interfaces
+
+
+#############################################################
+#  End of Testing
+#############################################################
+
+    - name: Validate Test Dict
+      debug: msg={{ testing['new_l3_interfaces'] }}
+
+    - name: Validate Actual Dict
+      debug: msg={{ underlay['loopbacks_l3_v2'] }}
+
+
+    - name: Configure Layer 3 interface configuration for loopbacks
+      nxos_l3_interfaces:
+        config: "{{ underlay['loopbacks_l3_v2'] }}" 
+        state: merged
+      tags:
+      - loopbacks
+
+    - name: Configure Layer 3 interface configuration for nve_loopbacks
+      nxos_l3_interfaces:
+        config: "{{ underlay['nve_loopbacks_l3_v2'] }}" 
+        state: merged
+      when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+      tags:
+      - loopbacks
+
+    - name: Set Layer 3 interface configuration for p2p connections
+      nxos_l3_interfaces:
+        config: "{{ underlay['interfaces_l3_v2'] }}" 
+        state: merged
+      tags:
+      - p2p_interfaces
+
+
+#############################################################
+#  Enable and configure PIM interfaces
+#############################################################
+    - block:
+      - name: Set base interface configuration for PIM RP
+        nxos_interfaces:
+          config: "{{ underlay['pim_v2'] }}" 
+          state: replaced
+        tags:
+        - pim
+      - name: Configure PIM RP interface configuration for loopbacks
+        nxos_l3_interfaces:
+          config: "{{ underlay['pim_l3_v2'] }}" 
+          state: replaced
+        tags:
+        - pim
+      when: inventory_hostname in groups.spine
+
+    - name: Confgure OSPF Underlay Interfaces for P2P Links
+      nxos_interface_ospf:
+        interface: "{{ item['name'] }}"
+        ospf: "{{ underlay['ospf']['process'] }}"
+        area: "{{ underlay['ospf']['area'] }}"
+        cost: default
+        passive_interface: false
+        network: point-to-point
+        state: present
+      with_items: 
+        - "{{ underlay['interfaces_l3_v2'] }}"
+      tags:
+        - configure_ospf_underlay
+        - ospf
+
+    - name: Confgure OSPF Underlay Interfaces for Loopbacks
+      nxos_interface_ospf:
+        interface: "{{ item['name'] }}"
+        ospf: "{{ underlay['ospf']['process'] }}"
+        area: "{{ underlay['ospf']['area'] }}"
+        cost: default
+        passive_interface:
+        state: present
+      with_items: 
+        - "{{ underlay['loopbacks_l3_v2'] }}"
+      tags:
+        - configure_ospf_underlay
+        - ospf
+
+#     ###  Could not get the if statment to work so you could loop through both 
+#     ###  p2p and loopback interfaces same nxos_interface_ospf module.
+#     ###  When you try to send a value for passive interface to a loop interface, the module
+#     ###  fails.  
+#     # - name: Confgure OSPF Underlay Interfaces for P2P Links
+#     #   nxos_interface_ospf:
+#     #     interface: "{{ item['name'] }}"
+#     #     ospf: "{{ underlay['ospf']['process'] }}"
+#     #     area: "{{ underlay['ospf']['area'] }}"
+#     #     cost: default
+#     #     #"{% if 'Loop' in item['name'] %} passive_interface: {% else %} passive_interface: false {% endif %}"
+#     #     passive_interface: "{% if 'Loop' in item['name'] %} ' ' {% else %} false {% endif %}"
+#     #     state: present
+#     #   with_items: 
+#     #     - "{{ underlay['interfaces_l3_v2'] }}"
+#     #     - "{{ underlay['loopbacks_l3_v2'] }}"
+#     #   tags:
+#     #     - configure_ospf_underlay
+#     #     - ospf
+
+    - name: Confgure OSPF Underlay Interfaces for NVE Loopbacks
+      nxos_interface_ospf:
+        interface: "{{ item['name'] }}"
+        ospf: "{{ underlay['ospf']['process'] }}"
+        area: "{{ underlay['ospf']['area'] }}"
+        cost: default
+        # Note: passive_interface not allowed for loopback interfaces.
+        passive_interface:
+        state: present
+      with_items: 
+        - "{{ underlay['nve_loopbacks_l3_v2'] }}"
+      when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+      tags:
+        - configure_ospf_underlay
+        - ospf
+
+    - name: Confgure OSPF PIM Anycast
+      nxos_interface_ospf:
+        interface: "{{ underlay['pim']['interface'] }}"
+        ospf: "{{ underlay['ospf']['process'] }}"
+        area: "{{ underlay['ospf']['area'] }}"
+        cost: default
+        # Note: passive_interface not allowed for loopback interfaces.
+        passive_interface:
+        state: present
+      when: inventory_hostname in groups.spine
+      tags:
+        - configure_ospf_pim_anycast
+        - ospf
+
+    - name: Configure PIM on underlay interfaces
+      nxos_pim_interface:
+        interface: "{{ item['name'] }}"
+        sparse: true
+      with_items:
+        - "{{ underlay['interfaces_l3_v2'] }}"
+        - "{{ underlay['loopbacks_l3_v2'] }}"
+      tags:
+        - configure_pim_on_underlay_interfaces
+        - pim
+
+    - name: Configure PIM on NVE interface Loopback
+      nxos_pim_interface:
+        interface: "{{ item['name'] }}"
+        sparse: true
+      when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+      with_items:
+        - "{{ underlay['nve_loopbacks_l3_v2'] }}"
+      tags:
+        - configure_pim_on_underlay_interfaces
+        - pim
+
+    - name: Configure PIM on anycast Loopback (this is loop 254)
+      nxos_pim_interface:
+        interface: "{{ underlay['pim']['interface'] }}"
+        sparse: true
+      when: inventory_hostname in groups.spine
+      tags:
+        - configure_pim_on_anycast_loopback
+        - pim
+
+    - name: Configure PIM RP
+      nxos_pim_rp_address:
+        rp_address: "{{ underlay['pim']['address'] }}"
+        state: present
+        group_list: "{{ underlay['pim']['grouplist'] }}"
+      tags:
+        - configure_pim_rp
+        - pim
+
+    - name: Configure PIM Anycast RP
+      nxos_config:
+        lines:
+          - ip pim anycast-rp {{ underlay['pim']['address'] }} {{ item['ipv4'][0]['address'] | ipaddr('network') }}
+      with_items:
+        - "{{ underlay['loopbacks_l3_v2'] }}"
+      when: inventory_hostname in groups.spine
+      tags:
+        - configure_pim_anycast_rp_spine
+        - pim
+#       rescue:
+#         - set_fact:
+#             trigger_msg: True
+#             send_msg: "{{ playbook_name }} -  error configure on {{ inventory_hostname }}"
+#           changed_when: True
+#           notify: notify using spark
+#         - name: Rollback to checkpoint
+#           nxos_rollback:
+#             rollback_to: checkpoint.cfg
+    
+# ...

@@ -1,0 +1,67 @@
+
+{% set nspace = namespace() %}
+
+{% set leafs = groups['leaf'] + groups['bleaf'] %}
+{% for id, peer in vpc_pairs.iteritems() %}
+{#
+leafs: {{ leafs }} 
+id: {{ id }} peer: {{peer}}
+inventory_hostname: {{inventory_hostname}}
+#}
+{%    if inventory_hostname in peer %}
+{%       if inventory_hostname in leafs %}
+{%          set vpcid = id %}
+{%          set index = peer|length %}
+vpc:
+  domain: {{ vpc.domain }} 
+{% for row in spreadsheet_Scott %}
+{% if row.Nodename == inventory_hostname and row.linktype == 'vPC' and row.vPC_role_pri %}
+  priority: {{ row.vPC_role_pri }}
+{% endif %}
+{% if row.Nodename == inventory_hostname and row.linktype == 'vPC' and row.vPC_sys_pri %}
+  system_priority:  {{ row.vPC_sys_pri }}
+{% endif %}
+{% endfor %}
+  po_id: {{ vpc.po_id }}
+  po_mode: {{ vpc.po_mode }}
+  vrf: {{ vpc.vrf }}
+  peer_gw: {{ vpc.peer_gw }}
+  auto_recovery: {{ vpc.auto_recovery }}
+  delay_restore: {{ vpc.delay_restore }}
+{%          for pointer in range(0,index) %}
+{%              if peer[pointer] == inventory_hostname %} 
+  vpc_src: {{ vpc_link[vpcid][pointer]["ip"] }}
+{%             else %}
+  vpc_dst: {{ vpc_link[vpcid][pointer]["ip"] }}
+  vpc_peer: {{ peer[pointer] }}
+{% set nspace.peer = peer[pointer] %}
+{%             endif %}
+{%          endfor %}
+  vlan: {{ vpc.vlan }}
+{%          for pointer in range(0,index) %}
+{%             if peer[pointer] == inventory_hostname %}
+  vlan_underlay_ipv4: {{ vpc_link[vpcid][pointer]["ip"] }}
+  vlan_underlay_mask: {{ vpc_link[vpcid][pointer]["mask"] }}                                                        
+{%             endif %}
+{%          endfor %}
+  vpc_interfaces:
+{%          for vpc_interfaces in vpc_interfaces[inventory_hostname] %}
+    - name: {{ vpc_interfaces }}
+      description: vPC Link Member to {{ nspace.peer }} {{ vpc_interfaces }}
+      enabled: true
+      mode: layer2
+{%          endfor %}
+  vpc_lag_interfaces:
+    - name: port-channel{{vpc.po_id}}
+      members:
+{%          for vpc_interfaces in vpc_interfaces[inventory_hostname] %}
+        - member: {{ vpc_interfaces }}
+          mode: {{ vpc.po_mode }}
+{%          endfor %}
+  nve_loopbacks:
+    - interface: {{ underlay["nve_loopbacks"][0]["interface"] }}
+      ipaddress_secondary: {{ vtep_anycast[vpcid]["ip"] }}
+      mask: {{ vtep_anycast[vpcid]["mask"] }}
+{%       endif %}
+{%    endif %}
+{% endfor %}

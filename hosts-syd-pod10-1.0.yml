@@ -1,0 +1,35 @@
+---
+#ansible -i ./hosts-syd-pod10-1.0.yml all -m ping -c local
+all:
+  children: 
+    network: #The World
+      children:
+        usa:  #Country in World
+          children: #Regions in Country
+            southwest:
+              children: #Cities in Region
+                las_vegas:
+                  children: #Role in Datacenter
+                    spine:
+                      hosts:
+                        n9k-spine-01:
+                          ansible_host: 10.66.94.212
+                    leaf:
+                      hosts:
+                        n9k-leaf-01:
+                          ansible_host: 10.66.94.215
+                        n9k-leaf-02:
+                          ansible_host: 10.66.94.216
+                    bleaf:
+                      hosts:
+                    bgw:
+                      hosts:
+          vars:  #Applies to all Territories in Country
+            ansible_user: admin
+            ansible_password: cisco!123
+            ansible_connection: network_cli 
+  vars:  #Applies to World
+    ansible_network_os: nxos
+
+
+

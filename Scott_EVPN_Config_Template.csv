@@ -1,0 +1,8 @@
+﻿Nodename,local_ifx,peer,remote_ifx,p2p-ip,vPC-role-pri,vPC-sys-pri,vPC-kal-ip,peer-gw,auto-rec,delay-res,peer-SW
+N9k-spine-01,eth1/1,N9k-leaf-01,eth1/1,0,,,,,,,
+N9k-spine-01,eth1/2,N9k-leaf-02,eth1/1,1,,,,,,,
+N9k-spine-02,eth1/1,N9k-leaf-01,eth1/2,2,,,,,,,
+N9k-spine-02,eth1/2,N9k-leaf-02,eth1/2,3,,,,,,,
+N9k-leaf-01,eth1/10,N9k-leaf-02,eth1/10,,200,200,,y,y,200,y
+N9k-leaf-01,eth1/11,N9k-leaf-02,eth1/11,,,,,,,,
+N9k-leaf-01,eth1/13,N9k-leaf-02,eth1/13,,,,0,,,,

@@ -1,0 +1,63 @@
+{% set previous_node = 'zero_host' %}
+{% set nspace = namespace() %}
+{% set nspace.previous = previous_node %}
+{% set nspace.counter = 0 %}
+topology:
+{% for row in spreadsheet_Scott %}
+{% set nspace.current = row.Nodename %}
+{% if nspace.current != nspace.previous  %}
+{% set nspace.counter = 0 %}
+  {{row.Nodename}}:
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.local_ifx}}
+      peer: {{row.peer}}
+      portid: 0
+      remote_ifx: {{row.remote_ifx}}
+{% set nspace.previous = nspace.current %}
+{% else %}
+{% set nspace.counter = nspace.counter + 1 %}
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.local_ifx}}
+      peer: {{row.peer}}
+      portid: 0
+      remote_ifx: {{row.remote_ifx}}
+{% set nspace.previous = nspace.current %}
+{% endif %}
+{% endfor %}
+{##}
+{% set previous_node = 'zero_host' %}
+{% set nspace.previous = previous_node %}
+{##}
+{% for row in spreadsheet_Scott %}
+{% set nspace.current = row.peer %}
+{% if nspace.current != nspace.previous  %}
+{% set nspace.counter = 0 %}
+  {{row.peer}}:
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.remote_ifx}}
+      peer: {{row.Nodename}}
+      portid: 1
+      remote_ifx: {{row.local_ifx}}
+{% set nspace.previous = nspace.current %}
+{% else %}
+{% set nspace.counter = nspace.counter + 1 %}
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.remote_ifx}}
+      peer: {{row.Nodename}}
+      portid: 1
+      remote_ifx: {{row.local_ifx}}
+{% set nspace.previous = nspace.current %}
+{% endif %}
+{% endfor %}
+
+
+
+

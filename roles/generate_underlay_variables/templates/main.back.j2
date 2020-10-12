@@ -1,0 +1,247 @@
+{#  #}
+{#  #}
+{#  #}
+{#% set leafs = groups['leaf'] + groups['bleaf'] + groups['bgw'] %#}
+{% set leafs = groups['leaf'] %}
+{#  The above set statement strings together the hosts from 3 different #}
+{#  groups into one super-list of hosts #}
+underlay:
+  ospf:
+    routerid: {{ ospf.routerid }}
+    process: {{ ospf.process }}
+    area: {{ ospf.area }}
+    cost: {{ ospf.cost }}
+  pim:
+    interface: {{ pim.interface }}
+    address: {{ pim.address }}
+    mask: {{ pim.mask }}
+    description: {{ pim.description }}
+    grouplist: {{ pim.grouplist }}
+{#    This is what we're writing to the data file we're creating.  None of   #}
+{#    this will make sense unless you already know what data you will need   #}
+{#    in your processing and how your processing expects to see it.          #}
+{#    We are merely taking raw data and re-formatting it for use by either   #}
+{#    Ansible modules or to be used in other templates.                      #}
+{#    #}
+{#    #}
+{#    #}
+{% for host in leafs %}
+{#    The leafs variable now becomes a loop iterator which covers hosts from #}
+{#    3 different host "groups".  As we will see below, if you wanted to     #}
+{#    iterate on a single inventory group, you will need to use the          #}
+{#    "groups['insert_group_name']" notation                                 #}
+{#    #}
+{#    The concept here is that you can execute the playbook on the whole     #}
+{#    inventory file and do select processing on subgroups in the file.  Or, #}
+{#    in this case, you can also put subgroups together and assign to a new  #}
+{#    variable.  #}
+{#    #}
+{%  if inventory_hostname == host %}
+{#    
+      Need to understand that there is always the invisible loop of going
+      through all the hosts in the host file and then building logic to 
+      execute steps for only those selected hosts out of that host file. 
+      So here, the "for host in leafs" builds the subset of the hosts we 
+      want to process.  Then, as we process the inventory file, we are saying
+      if the current inventory_host matches where we are in the list of
+      leafs, then we will execute the nested steps in this logic.
+      
+#}
+  role: leaf
+{%  endif %}
+{% endfor %}
+{##}
+{% for host in groups["spine"] %}
+{#    
+      When you work directly on a subset of hosts in an inventory file, you need
+      to preceed the group name with the groups[] notation.
+      
+      As above, this logic extracts a subset of the hosts out of the inventory 
+      file that you want process.  
+
+      Because Ansible is processing every host in the inventory file, we want to 
+      capture the situation where the current host we're processing in the '
+      inventory file matches one of the hosts in the subset of hosts we want 
+      to work on (in this case, the spine hosts only >> for host in groups["spine"])
+#}
+{%  if inventory_hostname == host %}
+{#
+      Read this as "As we loop through the subset of hosts that are in the spine group,
+      "Does the current inventory_hostname match one of the hosts in the spine
+      goup?"
+#}
+
+  role: spine
+{%  endif %}
+{% endfor %}
+  loopbacks:
+    - interface: Loopback0
+{% for id,host in nodes.iteritems() %}
+{#
+    First, understand that nodes in the topology file is a dictionary and the
+    way we access dictionary items is with with either keys, values, or both (items).
+    So to start the looping with the key, value as the iterator, we make up two
+    iterators, one is {id} and the other {host}.  The ID key is the sequential number
+    where the host/"node" is in the list.  Then the host is simply the value that
+    correlates to that key.  This will be the node name.
+    So the for-in syntax here is to loop throught he nodes in the topology file and use
+    that sequence number to pull a RID from the list of RIDs
+#}
+{%  if inventory_hostname == host %}
+{#    
+    As seen before, as we process all the hosts in the inventory file, we only want to 
+    process a subset of those hosts, mainly only those hosts that are specified in the
+    topology file in the "nodes" dictionary.  When we say "if inventory_hostname == host",
+    we are confirming that we will only pocess the current inventory_hostname if it 
+    it matches the node that we're pointing to in the for-in logic that we're processing
+    above "for id,host in nodes.iteritems()"
+#}
+      ipaddress: {{ rid[id]["ip"] }}
+{#
+    Here we're calling a nested value in the RID dictionary, using the ID pointer from the 
+    outer for-in loop that we're processing.  We use the value of the ID pointer to retrieve
+    the router id that corresponds to the sequence ID of the node we're working on. 
+    
+    We will see below that we can manaully specify the pointer in the data file itself 
+    instead of using the value of the iterator as the pointer.
+    
+#}
+      mask: {{ rid[id]["mask"] }}
+{#    Same goes for mask.  Using this syntax to retrieve a nested value based again, on the #}
+{#    the sequence nubmer we're on while we are iterating through the node list.  #}
+      description: loopback_underlay
+{%  endif %}
+{% endfor %}
+{% if inventory_hostname in leafs %}
+      {#
+      Note the difference in logic here.  Above we were in the middle of a for loop 
+      and we wanted to only process an inventory_hostname when the current hostname
+      pointer in the for loop matched the current inventory_hostname we were processing
+      in the hosts file.
+      
+      Here we're just interested in whether the current inventory_host name is in our 
+      "leafs" list and if so, yes or no, execute the following statements. 
+      #}
+  nve_loopbacks:
+    - interface: Loopback1
+{% endif %}
+{% for id,host in nodes.iteritems() %}
+{%    if inventory_hostname == host and host in leafs %}
+      ipaddress: {{ vtep[id]["ip"] }}
+      mask: {{ vtep[id]["mask"] }}
+{#    As above, we're retrieving the IP address from the vtep loop back dictionary based on the
+{#    sequence number we're currently on while we loop through the node list.
+{#    It's important to point out here that we're looping through the node list multiple times and
+{#    and we're performing different actions for different groups of inventory items (spines, leafs, etc)
+#}
+      description: loopback_underlay
+{%    endif %}
+{##}
+{% endfor %}
+  interfaces:
+{#
+      Now we can begin building the links between the switches.
+#}
+{% for key, value in topology.iteritems() %}
+{#    Standard notation here for accessing nested data in the topology dictionary in the topology file.
+      It is important to understand that the topology dictionary is a multi-tiered dictionary structure.  
+      We need to understand how we access the information in this nested data. 
+  
+topology:         << Topology is the name of the dictionary we're iterating through.  
+                     It consists of key,value pairs which in this structure is node name and peers for that node name
+                     Since peers is another dictionary, the name of that dictionary is the respective node name
+                     
+                     For better readability, 
+                     {% for key, value in topology.iteritems() %}
+                     should have been written 
+                     {% for node_name, link_peer in topology.iteritems() %}
+
+  Here comes the first key,value pair in the dictionary named "topology":
+  n9k-leaf-01:    << Higher level dictionary **key** (but also the name of a dictionary of peers and peer info)
+    0:            << Higher level dictionary **value** (a single item dictionary named "peers"
+                     a peer as the key and a nested dictionary as the value
+      linkid: 0
+      linktype: fabric
+      local_ifx: Eth1/1
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/1
+#}
+{%    if inventory_hostname == key %}  {# this gives us a clue as to what the key is we're iterating on #}
+{#
+     As a reminder, we're working on two loops, the outer loop is the processing of all all the
+     inventory_hostnames in the hosts file. The inner loop is processing only the hosts that appear 
+     in the topology dictionary in the topology.yml file we're reading from.  If the current
+     inventory_hostname we're processing matches the hostname key we're iterating on in the topology
+     dictionary, go ahead and execute the following nested statements.
+     
+     At this point, we're operating on the first key,value pair which is n9k-leaf-01,0
+#}
+{%        for id, peers in value.iteritems() %}  {# Note: "value" is defined earlier in the first for loop #}
+{#
+
+                     For better readability, 
+                     for id, peers in value.iteritems() %}
+                     should have been written 
+                     for peer_id, peer_info in value.iteritems() %}
+
+     The value from the first for-loop statment is the dictionary of peers, for which there is only one
+     peer identified for each node "0". By default, the name of this dictionary would be the key or 
+     the node name.
+
+     Now we have an additional NESTED loop we need to process.  Since we're already in a loop on
+     the higher level dictionary items, when we encounter another for loop statement, we will 
+     be operating deeper into the dictionary as follows:  
+
+     topology:                       << This is the name of the top-level dictionary accessed with the first for-loop statement. 
+      n9k-leaf-01:                   << This is the name of the nested dictionary we're now accessing with the second for-loop statement.      
+        0:                           << This is the first key in the nested dictionary ("n9k-leaf-01) we're accessing 
+                                        with the second for-loop statement  
+          linkid: 0                  |
+          linktype: fabric           | 
+          local_ifx: Eth1/1          |    << This is the value for the first key in the nested dictionary 
+          peer: n9k-spine-01         |       (which in and of itself is a dictionary of 
+          portid: 1                  |        key,value pairs related to the first key in the nested dictionary)
+          remote_ifx: Ethernet1/1    | 
+
+      To restate, in the first loop, we're operating on the key,value pair of node and dictionary of peers.
+      In the second, nested loop, we're operating on the key,value pair of node and peers 
+#}
+    - interface: {{ peers.local_ifx }}
+      {#
+      The modifier "peers" is the name of the dictionary for the id we're pointing at.  Note that we don't need to 
+      reference which id for this peer because we're already on a specific peer by virtue of the key,value syntax in the
+      for-loop statement (id, peers)
+
+      Also note that other notation could be used to access this nested data but the nested for-loops are what is
+      being used here
+      #}
+      {#
+      #}
+      description: to_{{ peers.peer.lower() }}_{{ peers.remote_ifx.lower() }}
+      {#
+      Note the lower() method to return lower case
+      #}
+      ipaddress: {{ p2p[peers.linkid][peers.portid]["ip"] }}
+      {#
+      Here we need to use the data in the topology file to identify which p2p subnet to pull from the 
+      generated-p2-subnets.yml file as well as which ip address in that subnet will be used for 
+      the local interface being configured.  
+      The genaral format of accessing the nexted data will be:
+        p2p:[][][ip]
+        Here, we're just using the data from the topology file to fill in the [][] in the nested notatino.
+      
+      To summarize then, we're using data from the topolgy file to access nested information 
+      in other files that are part of the playbook structure. 
+      1) First, we need to make sure we're on the right host
+      2) Second we need to access the correct nested data to drive the population of the template being
+         generated
+      #}
+      mask: {{ p2p[peers.linkid][peers.portid]["mask"] }}
+      {#
+      Same as above for pulling the ip addresses
+      #}
+      mtu: 9216
+{%        endfor %}
+{%    endif %}
+{% endfor %}

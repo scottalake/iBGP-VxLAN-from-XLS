@@ -1,0 +1,114 @@
+
+
+nodes:
+  0: n9k-leaf-01
+  1: n9k-leaf-02
+  2: n9k-spine-01
+
+vpc_interfaces:
+  n9k-leaf-01:
+  - Ethernet2/1
+  - Ethernet2/2
+  n9k-leaf-02:
+  - Ethernet2/1
+  - Ethernet2/2
+
+vpc_pairs: 
+  0:
+  - n9k-leaf-01
+  - n9k-leaf-02
+
+kal_links: 
+  n9k-leaf-01:
+  - Ethernet3/1
+  n9k-leaf-02:
+  - Ethernet3/1
+
+topology:
+  n9k-leaf-01:
+    0:
+      linkid: 0
+      linktype: fabric
+      local_ifx: Ethernet1/34
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/49
+    1:
+      linkid: 1
+      linktype: fabric
+      local_ifx: Ethernet2/30
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/50
+    2:
+      linkid: 2
+      linktype: fabric
+      local_ifx: Ethernet3/49
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/51
+  n9k-leaf-02:
+    0:
+      linkid: 3
+      linktype: fabric
+      local_ifx: Ethernet1/34
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/52
+    1:
+      linkid: 4
+      linktype: fabric
+      local_ifx: Ethernet2/30
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/53
+    2:
+      linkid: 5
+      linktype: fabric
+      local_ifx: Ethernet3/49
+      peer: n9k-spine-01
+      portid: 1
+      remote_ifx: Ethernet1/54
+  n9k-spine-01:
+    0:
+      linkid: 0
+      linktype: fabric
+      local_ifx: Ethernet1/49
+      peer: n9k-leaf-01
+      portid: 0
+      remote_ifx: Ethernet1/34
+    1:
+      linkid: 1
+      linktype: fabric
+      local_ifx: Ethernet1/50
+      peer: n9k-leaf-01
+      portid: 0
+      remote_ifx: Ethernet2/30
+    2:
+      linkid: 2
+      linktype: fabric
+      local_ifx: Ethernet1/51
+      peer: n9k-leaf-01
+      portid: 0
+      remote_ifx: Ethernet3/49
+    3:
+      linkid: 3
+      linktype: fabric
+      local_ifx: Ethernet1/52
+      peer: n9k-leaf-02
+      portid: 0
+      remote_ifx: Ethernet1/34
+    4:
+      linkid: 4
+      linktype: fabric
+      local_ifx: Ethernet1/53
+      peer: n9k-leaf-02
+      portid: 0
+      remote_ifx: Ethernet2/30
+    5:
+      linkid: 5
+      linktype: fabric
+      local_ifx: Ethernet1/54
+      peer: n9k-leaf-02
+      portid: 0
+      remote_ifx: Ethernet3/49

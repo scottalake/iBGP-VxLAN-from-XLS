@@ -1,0 +1,16 @@
+---
+- block:
+  - name: Check to see if legacy files exist and delete if necessary.
+    stat:
+      path: group_vars/all/generated_p2p_subnets.yml
+    register: file_present
+
+  - file: path=group_vars/all/generated_p2p_subnets.yml state=absent
+    when: file_present.stat.exists
+
+  - name: Generate P2P Subnets
+    template: >
+      src=main.j2
+      dest=group_vars/all/generated_p2p_subnets.yml
+  run_once: true
+

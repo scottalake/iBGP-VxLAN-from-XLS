@@ -1,0 +1,401 @@
+---
+- name: Configure Overlay
+  hosts: [leaf,bleaf,bgw,spine]
+  connection: local
+  gather_facts: no
+  roles:
+    - common
+  vars:
+    playbook_name: "Configure overlay infrastructure"
+  tasks:
+    - name: Create checkpoint
+      nxos_rollback:
+        checkpoint_file: checkpoint.cfg
+      tags:
+        - create_checkpoint
+    - block:
+      - name: Configure EVPN control plane
+        nxos_evpn_global:
+          nv_overlay_evpn: true
+        tags:
+          - choose_evpn_as_control_plane
+          - nvoverlayevpn
+          - spine
+          - leaf
+
+
+      - name: Configure Anycast GW MAC
+        nxos_overlay_global:
+          anycast_gateway_mac: "{{ overlay['overlay']['anycastgwmac'] }}"
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+        tags:
+          - configure_anycast_gw_mac
+          - anycastgw
+          - leaf
+
+      - name: Admin up NVE1 Interface
+        nxos_interfaces:
+          config:
+            - name: nve1
+              description: 'NVE Interface Configured by Ansible'
+              enabled: True
+          state: replaced
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+
+
+      - name: Configure NVE interface
+        nxos_vxlan_vtep:
+          interface: nve1
+          description: nve_interface
+          host_reachability: true
+          source_interface: "{{ overlay['overlay']['nvesourceifx'] }}"
+          source_interface_hold_down_time: "{{ overlay['overlay']['nveholddown'] }}"
+          shutdown: false
+          state: present
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+        tags:
+          - configure_nve_interface
+          - nve
+          - leaf
+
+      - name: Configure BGP ASN
+        nxos_bgp:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          router_id: "{{ overlay['bgpparameters']['routerid'] }}"
+          state: present
+
+##############################################################
+#  router bgp 65100
+#  router-id 88.88.88.0
+##############################################################
+
+
+      - name: Configure BGP AF 
+        nxos_bgp_af:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          afi: l2vpn
+          safi: evpn
+          state: present
+#           tags:
+#           - configure_bgp_af
+#           - bgp
+#           - spine
+#           - leaf
+
+##############################################################
+# router bgp 65100
+#   router-id 88.88.88.0
+#   address-family l2vpn evpn
+##############################################################
+
+
+      - name: Configure BGP EVPN NEIGHBOR
+        nxos_bgp_neighbor:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          neighbor: "{{ item['rid'] }}"
+          remote_as: "{{ overlay['bgpparameters']['asn'] }}"
+          update_source: "{{ overlay['bgpparameters']['updatesource'] }}"
+          description: "{{ item['desc'] }}"
+          state: present
+        with_items: "{{ overlay['bgpneighbors']['neighbor'] }}"
+        tags:
+          - configure_bgp_evpn_nei
+          - bgp
+          - spine
+          - leaf
+
+##############################################################
+# router bgp 65100
+#   router-id 88.88.88.2
+#   address-family l2vpn evpn
+#   neighbor 88.88.88.0
+#     remote-as 65100
+#     description n9k-leaf-01
+#     update-source loopback0
+#   neighbor 88.88.88.1
+#     remote-as 65100
+#     description n9k-leaf-02
+#     update-source loopback0
+##############################################################
+
+      - name: Configure BGP EVPN
+        nxos_bgp_neighbor_af:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          neighbor: "{{ item['rid'] }}"
+          afi: l2vpn
+          safi: evpn
+          send_community: both
+          state: present
+        with_items: "{{ overlay['bgpneighbors']['neighbor'] }}"
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+        tags:
+          - configure_bgp_evpn
+          - bgp
+          - leaf
+
+##############################################################
+# router bgp 65100
+#   router-id 88.88.88.0
+#   address-family l2vpn evpn
+#   neighbor 88.88.88.2
+#     remote-as 65100
+#     description n9k-spine-01
+#     update-source loopback0
+#     address-family l2vpn evpn      # << 
+#       send-community               # << 
+#       send-community extended      # <<
+##############################################################
+
+      - name: Configure BGP IPv4
+        nxos_bgp_neighbor_af:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          neighbor: "{{ item['rid'] }}"
+          afi: ipv4
+          safi: unicast
+          send_community: both
+          state: present
+        with_items: "{{ overlay['bgpneighbors']['neighbor'] }}"
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+        tags:
+          - configure_bgp_ipv4
+          - bgp
+          - leaf
+##############################################################
+### LEAF
+# router bgp 65100
+#   router-id 88.88.88.0
+#   address-family l2vpn evpn
+#   neighbor 88.88.88.2
+#     remote-as 65100
+#     description n9k-spine-01
+#     update-source loopback0
+#     address-family ipv4 unicast  #<<
+#       send-community             #<<    
+#       send-community extended    #<<
+#     address-family l2vpn evpn
+#       send-community
+#       send-community extended
+# ## SPINE
+# router bgp 65100
+#   router-id 88.88.88.2
+#   address-family l2vpn evpn
+#   neighbor 88.88.88.0
+#     remote-as 65100
+#     description n9k-leaf-01
+#     update-source loopback0
+#   neighbor 88.88.88.1
+#     remote-as 65100
+#     description n9k-leaf-02
+#     update-source loopback0
+##############################################################
+
+      - name: Configure BGP EVPN L2VPN Route Reflector
+        nxos_bgp_neighbor_af:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          neighbor: "{{ item['rid'] }}"
+          afi: l2vpn
+          safi: evpn
+          route_reflector_client: "true"
+          send_community: both
+          state: present
+        with_items: "{{ overlay['bgpneighbors']['neighbor'] }}"
+        when: inventory_hostname in groups.spine
+        tags:
+          - configure_bgp_rvpn_rr
+          - bgp
+          - spine
+
+##############################################################
+# router bgp 65100
+#   router-id 88.88.88.2
+#   address-family l2vpn evpn
+#   neighbor 88.88.88.0
+#     remote-as 65100
+#     description n9k-leaf-01
+#     update-source loopback0
+#     address-family l2vpn evpn       # <<
+#       send-community                # <<
+#       send-community extended       # <<
+#       route-reflector-client        # <<
+#   neighbor 88.88.88.1
+#     remote-as 65100
+#     description n9k-leaf-02
+#     update-source loopback0
+#     address-family l2vpn evpn       # <<
+#       send-community                # <<
+#       send-community extended       # <<
+#       route-reflector-client        # <<
+##############################################################
+
+      - name: Configure BGP IPv4 Route Reflector
+        nxos_bgp_neighbor_af:
+          asn: "{{ overlay['bgpparameters']['asn'] }}"
+          neighbor: "{{ item['rid'] }}"
+          afi: ipv4
+          safi: unicast
+          route_reflector_client: "true"
+          send_community: both
+          state: present
+        with_items: "{{ overlay['bgpneighbors']['neighbor'] }}"
+        when: inventory_hostname in groups.spine
+        tags:
+          - configure_bgp_ipv4_rr
+          - bgp
+          - spine
+
+##############################################################
+# router bgp 65100
+#   router-id 88.88.88.2
+#   address-family l2vpn evpn
+#   neighbor 88.88.88.0
+#     remote-as 65100
+#     description n9k-leaf-01
+#     update-source loopback0
+#     address-family ipv4 unicast       # << 
+#       send-community                  # << 
+#       send-community extended         # << 
+#       route-reflector-client          # << 
+#     address-family l2vpn evpn
+#       send-community
+#       send-community extended
+#       route-reflector-client
+#   neighbor 88.88.88.1
+#     remote-as 65100
+#     description n9k-leaf-02
+#     update-source loopback0
+#     address-family ipv4 unicast
+#       send-community
+#       send-community extended
+#       route-reflector-client
+#     address-family l2vpn evpn
+#       send-community
+#       send-community extended
+#       route-reflector-client
+##############################################################
+
+
+##############################################################
+
+      - name: Configure BGP redistrib TAG
+        nxos_config:
+          lines:
+            - route-map RMAP-REDIST-DIRECT permit 10
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf
+        tags:
+          - configure_overlay_reditrib_tag
+
+      - name: Configure BGP redistrib TAG
+        nxos_config:
+          lines:
+            - "match tag {{ overlay['bgpparameters']['asn'] }}"
+          parents: route-map RMAP-REDIST-DIRECT permit 10
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf
+        tags:
+          - configure_overlay_reditrib_tag
+
+##############################################################
+# route-map RMAP-REDIST-DIRECT permit 10
+#   match tag 65100 
+##############################################################
+
+##############################################################
+
+      - name: Configure BGP redistrib TAG
+        nxos_config:
+          lines:
+            - route-map RMAP-REDIST-STATIC permit 10
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf
+        tags:
+          - configure_overlay_reditrib_tag
+      - name: Configure BGP redistrib TAG
+        nxos_config:
+          lines:
+            - "match tag {{ overlay['bgpparameters']['asn'] }}"
+          parents: route-map RMAP-REDIST-STATIC permit 10
+        when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf
+        tags:
+          - configure_overlay_reditrib_tag
+
+
+##############################################################
+# route-map RMAP-REDIST-STATIC permit 10
+#   match tag 65100 
+##############################################################
+
+
+
+##############################################################
+
+      - name: Configure Advertise-PIP NVE
+        nxos_config:
+          lines:
+            - advertise virtual-rmac
+          parents: interface nve1
+        when: inventory_hostname in groups.bleaf or inventory_hostname in groups.leaf
+        tags:
+          - configure_nve1_advertise_pip
+          - pip
+          - nve
+          - bleaf
+
+##############################################################
+# interface nve1
+#   no shutdown
+#   description nve_interface
+#   host-reachability protocol bgp
+#   advertise virtual-rmac                 # <<
+#   source-interface loopback1
+#   source-interface hold-down-time 60
+##############################################################
+
+
+
+
+##############################################################
+
+      - name: Configure Advertise-PIP BGP
+        nxos_config:
+          lines:
+            - advertise-pip
+          parents:
+            - "router bgp {{ overlay['bgpparameters']['asn'] }}"
+            - address-family l2vpn evpn 
+          after: exit
+        when: inventory_hostname in groups.bleaf or inventory_hostname in groups.leaf
+        tags:
+          - configure_nve1_advertise_pip
+          - pip
+          - nve
+          - bleaf
+
+##############################################################
+# router bgp 65100
+#   router-id 88.88.88.1
+#   address-family l2vpn evpn
+#     advertise-pip                    # <<
+#   neighbor 88.88.88.2
+#     remote-as 65100
+#     description n9k-spine-01
+#     update-source loopback0
+#     address-family ipv4 unicast
+#       send-community
+#       send-community extended
+#     address-family l2vpn evpn
+#       send-community
+#       send-community extended
+##############################################################
+
+
+
+##############################################################
+
+#       rescue:
+#         - set_fact:
+#             trigger_msg: True
+#             send_msg: "{{ playbook_name }} -  error configure on {{ inventory_hostname }}"
+#           changed_when: True
+#           notify: notify using spark
+#         - name: Rollback to checkpoint
+#           nxos_rollback:
+#             rollback_to: checkpoint.cfg
+#   # ...

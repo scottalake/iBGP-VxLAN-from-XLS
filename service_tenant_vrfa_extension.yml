@@ -1,0 +1,4 @@
+services:
+  - { vlanid: 100, service: l2l3vni, mtu: 9216, vrfname: VRFA, l3vnivlan: 10, gwipaddress: "192.168.123.254/24" }
+bgp_address_families:
+  - { vrf: VRFA, afi: ipv4, safi: unicast }

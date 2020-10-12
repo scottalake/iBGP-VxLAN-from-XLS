@@ -1,0 +1,53 @@
+{% set leafs = groups['leaf'] + groups['bleaf'] %}
+{#
+leafs: {{ leafs }} 
+{% for id, peer in vpc_pairs.iteritems() %}
+#}
+id: {{ id }} peer: {{peer}}
+{#
+inventory_hostname: {{inventory_hostname}}
+#}
+{%    if inventory_hostname in peer %}
+{%       if inventory_hostname in leafs %}
+{%          set vpcid = id %}
+{%          set index = peer|length %}
+vpc:
+  domain: {{ vpc.domain }} 
+  priority: {{ vpc.priority }}
+  system_priority: {{ vpc.system_priority }}
+  po_id: {{ vpc.po_id }}
+  po_mode: {{ vpc.po_mode }}
+  vrf: {{ vpc.vrf }}
+  peer_gw: {{ vpc.peer_gw }}
+  auto_recovery: {{ vpc.auto_recovery }}
+  delay_restore: {{ vpc.delay_restore }}
+{%          for pointer in range(0,index) %}
+{%              if peer[pointer] == inventory_hostname %} 
+  vpc_src: {{ vpc_link[vpcid][pointer]["ip"] }}
+{%             else %}
+  vpc_dest: {{ vpc_link[vpcid][pointer]["ip"] }}
+  vpc_peer: {{ peer[pointer] }}
+{%             endif %}
+{%          endfor %}
+  vlan: {{ vpc.vlan }}
+{%          for pointer in range(0,index) %}
+{%             if peer[pointer] == inventory_hostname %}
+  vlan_underlay_ipv4: {{ vpc_link[vpcid][pointer]["ip"] }}
+  vlan_underlay_mask: {{ vpc_link[vpcid][pointer]["mask"] }}                                                        
+{%             endif %}
+{%          endfor %}
+  vpc_interfaces:
+{%          for vpc_interfaces in vpc_interfaces[inventory_hostname] %}
+{#
+    - {{ vpc_interfaces|replace("Eth", "Ethernet") }}
+#}
+    - {{ vpc_interfaces }}
+{%          endfor %}
+  nve_loopbacks:
+    - interface: {{ underlay["nve_loopbacks"][0]["interface"] }}
+      ipaddress_secondary: {{ vtep_anycast[vpcid]["ip"] }}
+      mask: {{ vtep_anycast[vpcid]["mask"] }}
+{%       endif %}
+{%    endif %}
+{% endfor %}
+

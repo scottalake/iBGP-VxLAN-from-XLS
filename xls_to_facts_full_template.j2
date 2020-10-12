@@ -1,0 +1,111 @@
+
+
+{{'nodes:' -}}
+{% set nspace = namespace() %}
+{% set nspace.counter = 0 %}
+{% set node_list = [] %}
+{% for row in spreadsheet_Scott %}
+{% set current_node = row.Nodename %}
+{% if current_node not in node_list %}
+{{ node_list.append( current_node ) }}
+  {{nspace.counter }}: {{ current_node -}}
+{% set nspace.counter = nspace.counter + 1 %}
+{% else %}
+{% endif %}
+{% endfor %}
+
+
+{% set nspace = namespace() %}
+vpc_interfaces:
+{% for node in node_list %}
+{% set nspace.counter = 0 %}
+{% for row in spreadsheet_Scott %}
+{% if row.Nodename == node and row.linktype == 'vPC' %}
+{% if nspace.counter == 0 %}
+  {{ row.Nodename }}:
+  - {{ row.local_ifx }}
+{% set nspace.counter = nspace.counter + 1 %}
+{% else %}
+  - {{ row.local_ifx }}
+{% endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+{% set vpc_pair_list = [] %}
+{% set nspace = namespace() %}
+{{'vpc_pairs:' -}}
+{% set nspace.counter = 0 %}
+{% for node in node_list %}
+{% for row in spreadsheet_Scott %}
+{% set current_node = row.Nodename %}
+{% if current_node not in vpc_pair_list %}
+{%   if row.Nodename == node and row.linktype == 'kal' %} 
+  {{nspace.counter -}}:
+  - {{ row.Nodename }}
+  - {{ row.peer -}}
+{{   vpc_pair_list.append( row.Nodename ) -}}
+{{   vpc_pair_list.append( row.peer ) -}}
+{%   set nspace.counter = nspace.counter + 1 %}
+{%   endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+
+{% set kal_pair_list = [] %}
+{% set nspace = namespace() %}
+{{'kal_links:' -}}
+{% set nspace.counter = 0 %}
+{% for node in node_list %}
+{% for row in spreadsheet_Scott %}
+{% set current_node = row.Nodename %}
+{% if current_node not in kal_pair_list %}
+{%   if row.Nodename == node and row.linktype == 'kal' %} 
+  {{ row.Nodename }}:
+  - {{ row.local_ifx }}
+  {{ row.peer }}:
+  - {{ row.remote_ifx -}}
+{{   kal_pair_list.append( row.Nodename ) -}}
+{{   kal_pair_list.append( row.peer ) -}}
+{%   set nspace.counter = nspace.counter + 1 %}
+{%   endif %}
+{% endif %}
+{% endfor %}
+{% endfor %}
+
+
+{% set previous_node = 'zero_host' %}
+{% set nspace = namespace() %}
+{% set nspace.previous = previous_node %}
+{% set nspace.counter = 0 %}
+topology:
+{% for row in spreadsheet_Scott %}
+{% set nspace.current = row.Nodename %}
+{% if nspace.current != nspace.previous  %}
+{% set nspace.counter = 0 %}
+{%   if row.linktype == 'fabric'  %}
+  {{row.Nodename}}:
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.local_ifx}}
+      peer: {{row.peer}}
+      portid: {{row.portid}}
+      remote_ifx: {{row.remote_ifx}}
+{%   endif %}
+{% set nspace.previous = nspace.current %}
+{% else %}
+{%   if row.linktype == 'fabric'  %}
+{%   set nspace.counter = nspace.counter + 1 %}
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.local_ifx}}
+      peer: {{row.peer}}
+      portid: {{row.portid}}
+      remote_ifx: {{row.remote_ifx}}
+{%   set nspace.previous = nspace.current %}
+{%   endif %}
+{% endif %}
+{% endfor %}

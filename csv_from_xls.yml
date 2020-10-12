@@ -1,0 +1,13 @@
+---
+- name: Sample role for configuring Nexus 9000 leaf switches in the ITC
+  hosts: localhost
+
+  tasks:
+    - name: Import facts from an XLS file
+      xls_to_facts:
+        src: './Scott_EVPN_Config_Template.xlsx'
+
+    - debug:
+        var='spreadsheet_Scott'
+
+

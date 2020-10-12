@@ -1,0 +1,13 @@
+overlay:
+  bgpparameters:
+    asn: 65100
+    routerid:        88.88.88.4   
+    updatesource: Loopback0
+    
+  bgpneighbors:
+    neighbor:
+      - { rid: 88.88.88.0, desc: n9k-spine-01 }
+  overlay:
+    anycastgwmac: aaaa.aaaa.aaaa
+    nvesourceifx: Loopback1
+    nveholddown: 60

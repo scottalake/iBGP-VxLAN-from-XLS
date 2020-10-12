@@ -1,0 +1,46 @@
+{% set leafs = groups['leaf'] + groups['bleaf'] + groups['bgw'] %}
+overlay:
+  bgpparameters:
+    asn: {{ bgp.asn }}
+    routerid:{% for id,host in nodes.iteritems() %} {% if host == inventory_hostname %} {{ rid[id]['ip'] }} {% endif %} {% endfor %} 
+    updatesource: {{ bgp.updatesource }}
+    {#    
+    The ip address value associated with the "routerid:" key is determined by logic that needs to be on the same line.
+    We have run into the following line in all the data file generators:
+    {% if host == inventory_hostname %}
+    In the topology file, we start with a list of nodes
+    nodes:
+      0: n9k-spine-01
+      1: n9k-spine-01
+      2: n9k-leaf-01
+      3: n9k-leaf-02
+      4: n9k-leaf-03
+    The logic here is that we're going to loop through this list of nodes until we have a match with 
+    the current inventory_host that we're processing in the hosts file. 
+    When we have a match, then we will retrieve the ip address from within the nested structure
+    #}
+
+  bgpneighbors:
+{% for id,host in nodes.iteritems() %}
+{% if inventory_hostname == host %}
+    neighbor:
+{% if host in groups["spine"] %}
+{% for id,host in nodes.iteritems() %}
+{% if host in leafs %}
+      - { rid: {{ rid[id]['ip'] }}, desc: {{ host }} }
+{% endif %}
+{% endfor %}
+{% endif %}
+{% if host in leafs %}
+{% for id,host in nodes.iteritems() %}
+{% if host in groups["spine"] %}
+      - { rid: {{ rid[id]['ip'] }}, desc: {{ host }} }
+{% endif %}
+{% endfor %}
+{% endif %}
+{% endif %}
+{% endfor %}
+  overlay:
+    anycastgwmac: {{ overlay.anycastgwmac }}
+    nvesourceifx: {{ overlay.nvesourceifx }}
+    nveholddown: {{ overlay.nveholddown }}

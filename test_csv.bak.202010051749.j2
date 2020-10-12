@@ -1,0 +1,126 @@
+{#
+{% set ns = namespace(items=0) %}
+{% for row in spreadsheet_Scott %}
+    {% set ns.items = ns.items + 1 %}
+{% endfor %}
+{{ ns.items }}
+
+{% set ns = namespace(found=false) %}
+{% for item in items %}
+    {% if item.check_something() %}
+        {% set ns.found = true %}
+    {% endif %}
+    * {{ item.title }}
+{% endfor %}
+Found item having something: {{ ns.found }}
+
+one
+{% set link_counter = namespace(items=0) %}
+{% for row in spreadsheet_Scott %}
+{% set link_counter.items = link_counter.items + 1 %}
+Link_counter test: {{link_counter.items}}:
+{% endfor %}
+
+two
+{% set link_counter = namespace(items=0) %}
+{% for row in spreadsheet_Scott %}
+    {{link_counter.items}}:
+{% set link_counter.items = link_counter.items + 1 %}
+    {{link_counter.items}}:
+{% endfor %}
+
+
+three
+{% set new_host_ns = namespace(present=default) %}
+{% set previous_node = spreadsheet_Scott[0].Nodename %}
+{% for row in spreadsheet_Scott %}
+{% if row.Nodename == previous_node %}
+{% set new_host_ns.present = true %}
+Validate True: {{new_host_ns.present}}
+{% else %}
+{% set new_host_ns.present = false %}
+Validate False: {{new_host_ns.present}}
+{% endif %}
+{% endfor %}
+
+four
+{% for row in spreadsheet_Scott %}
+    {% if loop.changed(row.Nodename) %}
+        yes changed {{ row.Nodename }}
+    {% else %}
+        did not change {{ row.Nodename }}
+    {% endif %}
+{% endfor %}
+#}
+
+{#
+{% set previous_node = spreadsheet_Scott[0].Nodename %}
+{% set nspace = namespace() %}
+{% set nspace.previous = previous_node %}
+{{nspace.previous}}
+{% set nspace.current = row.Nodename %}
+{{nspace.current}}
+#}
+
+{#}
+{% set previous_node = spreadsheet_Scott[0].Nodename %}
+{% set nspace = namespace() %}
+{% set nspace.previous = previous_node %}
+{% for row in spreadsheet_Scott %}
+{% set nspace.current = row.Nodename %}
+{% if nspace.current != nspace.previous  %}
+no match
+{% else %}
+match
+{% endif %}
+{% endfor %}
+
+{% set link_counter = namespace(items=0) %}
+{{nspace.counter}}
+{% set nspace.counter = nspace.counter + 1 %}
+{{nspace.counter}}
+
+#}
+
+
+{% set previous_node = 'zero_host' %}
+{% set nspace = namespace() %}
+{% set nspace.previous = previous_node %}
+{% set nspace.counter = 0 %}
+
+topology:
+{% for row in spreadsheet_Scott %}
+We're on {{row.Nodename}} link to {{row.peer}} interface {{row.remote_ifx}}
+{% set nspace.current = row.Nodename %}
+{% if nspace.current != nspace.previous  %}
+new host encountered
+{% set nspace.counter = 0 %}
+  {{row.Nodename}}:
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.local_ifx}}
+      peer: {{row.peer}}
+      portid: 1
+      remote_ifx: {{row.remote_ifx}}
+{% set nspace.previous = nspace.current %}
+link_counter value at end of new host encountered {{nspace.counter}}:
+{% else %}
+previously seen host encountered
+link_counter value at begining of same host encountered {{nspace.counter}}:
+{% set nspace.counter = nspace.counter + 1 %}
+link_counter check after increment {{nspace.counter}}:
+    {{nspace.counter}}:
+      linkid: {{row.linkid}}
+      linktype: {{row.linktype}}
+      local_ifx: {{row.local_ifx}}
+      peer: {{row.peer}}
+      portid: 1
+      remote_ifx: {{row.remote_ifx}}
+{% set nspace.previous = nspace.current %}
+{% endif %}
+{% endfor %}
+
+
+
+
