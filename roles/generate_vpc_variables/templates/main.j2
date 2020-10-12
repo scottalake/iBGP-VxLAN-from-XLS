@@ -1,6 +1,5 @@
 
 {% set nspace = namespace() %}
-
 {% set leafs = groups['leaf'] + groups['bleaf'] %}
 {% for id, peer in vpc_pairs.iteritems() %}
 {#
@@ -51,6 +50,13 @@ vpc:
       enabled: true
       mode: layer2
 {%          endfor %}
+  kal_interface:
+{%          for kal_interface in kal_links[inventory_hostname] %}
+    - name: {{ kal_interface }}
+      description: vPC Keepalive Link Member to {{ nspace.peer }} {{ kal_interface }}
+      enabled: true
+      mode: layer3
+{%          endfor %}
   vpc_lag_interfaces:
     - name: port-channel{{vpc.po_id}}
       members:
@@ -65,3 +71,14 @@ vpc:
 {%       endif %}
 {%    endif %}
 {% endfor %}
+{#
+#logic
+We're just building a 2.9 compatible interface list from this structure:
+kal_links: 
+  n9k-leaf-01:
+  - Ethernet3/1
+  n9k-leaf-02:
+  - Ethernet3/1
+#}
+
+
