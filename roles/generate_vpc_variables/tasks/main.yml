@@ -8,6 +8,9 @@
   - file: path=host_vars/{{inventory_hostname}}/generated_vpc_variables.yml state=absent
     when: file_present.stat.exists
 
+  - name: Validate vPC Peer Dict Exists
+    debug: msg={{ vpc_pairs }}
+
   - name: Generate VPC variables
     template: >
       src=main.j2

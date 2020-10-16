@@ -1,6 +1,26 @@
 
 
-
+nodes2:
+  0: 
+    name: n9k-spine-01
+    asn: 65001
+    role: spine
+  1: 
+    name: n9k-spine-02
+    asn: 65001
+    role: spine
+  2: 
+    name: n9k-leaf-01
+    asn: 65001
+    role: leaf
+  3: 
+    name: n9k-leaf-02
+    asn: 65001
+    role: leaf
+  4: 
+    name: n9k-leaf-03
+    asn: 65001
+    role: leaf
 
 nodes:
   0: n9k-spine-01
