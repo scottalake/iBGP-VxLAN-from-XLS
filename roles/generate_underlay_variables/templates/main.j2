@@ -60,11 +60,11 @@ underlay:
   loopbacks_v2:
    - name: Loopback0
      enabled: true
-     description: loopback_underlay
+     description: Underlay Loopback for BGP Neighbors
   nve_loopbacks_v2:
    - name: Loopback1
      enabled: true
-     description: loopback_underlay
+     description: NVE Loopback
   interfaces_v2:
 {% for key, value in topology.iteritems() %}
 {%   if inventory_hostname == key %}
@@ -83,12 +83,43 @@ underlay:
   loopbacks_l3_v2:
    - name: Loopback0
      ipv4:
+{############################################################################}
+{#    
+Side note re dictionary looping in jinja2 vs. ansible.
+Ansible has lots of tweaks to access nested information (with_dict, with_subelements).
+With jinja2, you have to manually configure nested loops to access nested data.
+One question we haven't answered is how to access nested lists in dictionaries.
+#}
+{############################################################################}
+
 {% for id,host in nodes.iteritems() %}
 {%   if inventory_hostname == host %}
        - address: {{ rid[id]["ip"] }}/{{ rid[id]["mask"] }}
          tag: "{{ overlay['bgpparameters']['asn'] }}"
 {%   endif %}
 {% endfor %}
+{############################################################################}
+{#    
+Are we accessing nested list data above?  No. Here is the structure
+rid:
+  0: { "ip": 88.88.88.0, "mask": 32 }
+  1: { "ip": 88.88.88.1, "mask": 32 }
+  2: { "ip": 88.88.88.2, "mask": 32 }
+  3: { "ip": 88.88.88.3, "mask": 32 }
+  4: { "ip": 88.88.88.4, "mask": 32 }
+  5: { "ip": 88.88.88.5, "mask": 32 }
+This is the same as 
+rid:
+  0:
+    ip: 88.88.88.0
+    mask: 32
+  1:
+    ip: 88.88.88.1
+    mask: 32
+etc.
+
+#}
+{############################################################################}
 {% if inventory_hostname in leafs %}
   nve_loopbacks_l3_v2:
     - name: Loopback1

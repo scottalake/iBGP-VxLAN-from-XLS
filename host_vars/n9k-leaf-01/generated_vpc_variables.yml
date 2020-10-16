@@ -1,5 +1,3 @@
-
-
 vpc:
   domain: 1000 
   priority: 100
@@ -26,6 +24,15 @@ vpc:
       description: vPC Link Member to n9k-leaf-02 Ethernet2/2
       enabled: true
       mode: layer2
+  kal_interface:
+    - name: Ethernet3/1
+      description: vPC Keepalive Link Member to n9k-leaf-02 Ethernet3/1
+      enabled: true
+      mode: layer3
+  kal_interface_l3:
+    - name: Ethernet3/1
+      ipv4:
+        - address: 192.168.168.1/30
   vpc_lag_interfaces:
     - name: port-channel4096
       members:
@@ -37,3 +44,15 @@ vpc:
     - interface: Loopback1
       ipaddress_secondary: 10.154.154.0
       mask: 32
+  nve_loopbacks_v2:
+   - name: Loopback1
+     enabled: true
+     description: NVE_Loopback
+  nve_loopbacks_l3_v2:
+    - name: Loopback1
+      ipv4:
+        - address: 10.154.154.0/32
+          secondary: True
+          tag: "65100"
+
+

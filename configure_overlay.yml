@@ -43,10 +43,16 @@
         when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
 
 
+##############################################################
+# interface nve1
+#   description NVE Interface Configured by Ansible
+##############################################################
+
+
       - name: Configure NVE interface
         nxos_vxlan_vtep:
           interface: nve1
-          description: nve_interface
+          description: 'NVE Interface Configured by Ansible'
           host_reachability: true
           source_interface: "{{ overlay['overlay']['nvesourceifx'] }}"
           source_interface_hold_down_time: "{{ overlay['overlay']['nveholddown'] }}"
@@ -57,6 +63,15 @@
           - configure_nve_interface
           - nve
           - leaf
+
+##############################################################
+# interface nve1
+#   no shutdown
+#   description NVE Interface Configured by Ansible
+#   host-reachability protocol bgp
+#   source-interface loopback1
+#   source-interface hold-down-time 60
+##############################################################
 
       - name: Configure BGP ASN
         nxos_bgp:
@@ -389,13 +404,13 @@
 
 ##############################################################
 
-#       rescue:
-#         - set_fact:
-#             trigger_msg: True
-#             send_msg: "{{ playbook_name }} -  error configure on {{ inventory_hostname }}"
-#           changed_when: True
-#           notify: notify using spark
-#         - name: Rollback to checkpoint
-#           nxos_rollback:
-#             rollback_to: checkpoint.cfg
-#   # ...
+# #       rescue:
+# #         - set_fact:
+# #             trigger_msg: True
+# #             send_msg: "{{ playbook_name }} -  error configure on {{ inventory_hostname }}"
+# #           changed_when: True
+# #           notify: notify using spark
+# #         - name: Rollback to checkpoint
+# #           nxos_rollback:
+# #             rollback_to: checkpoint.cfg
+# #   # ...

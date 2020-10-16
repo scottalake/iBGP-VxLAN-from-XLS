@@ -33,8 +33,9 @@
           state: present
           log_adjacency: detail
           passive_interface: false
-        #   router_id: "{% if item['interface'] == underlay['ospf']['routerid'] %} {{ item['ipaddress'] }} {% else %} 1.1.1.1 {% endif %}"
-        # with_items: "{{ underlay['loopbacks'] }}"
+      #   router_id: "{% if item['interface'] == underlay['ospf']['routerid'] %} {{ item['ipaddress'] }} {% else %} 1.1.1.1 {% endif %}"
+      # with_items: "{{ underlay['loopbacks'] }}"
+      # Switched to new 2.9 data structure below
           router_id: "{% if item['name'] == underlay['ospf']['routerid'] %} {{ item['ipv4'][0]['address'] | ipaddr('network') }} {% else %} 1.1.1.1 {% endif %}"
         with_items: "{{ underlay['loopbacks_l3_v2'] }}"
         tags:
@@ -100,31 +101,25 @@
 #  More Testing
 #############################################################
 
-    - name: Set base interface configuration (test scenario)
-      nxos_interfaces:
-#        config: "{{ new_interfaces }}"
-        config: "{{ testing['new_interfaces'] }}" 
-        state: merged
-      tags: interfaces
+#     - name: Set base interface configuration (test scenario)
+#       nxos_interfaces:
+#         config: "{{ testing['new_interfaces'] }}" 
+#         state: merged
+#       tags: interfaces
 
-    - name: Configure Layer3 interface addressing (test scenario)
-      nxos_l3_interfaces:
-        config: "{{ testing['new_l3_interfaces'] }}" 
-#        config: "{{ new_l3_interfaces }}"
-        state: merged
-      tags: l3_interfaces
+#     - name: Configure Layer3 interface addressing (test scenario)
+#       nxos_l3_interfaces:
+#         config: "{{ testing['new_l3_interfaces'] }}" 
+#         state: merged
+#       tags: l3_interfaces
 
 
 #############################################################
 #  End of Testing
 #############################################################
 
-    - name: Validate Test Dict
-      debug: msg={{ testing['new_l3_interfaces'] }}
-
-    - name: Validate Actual Dict
+    - name: Validate Loopback L3 Dict
       debug: msg={{ underlay['loopbacks_l3_v2'] }}
-
 
     - name: Configure Layer 3 interface configuration for loopbacks
       nxos_l3_interfaces:
@@ -133,13 +128,31 @@
       tags:
       - loopbacks
 
-    - name: Configure Layer 3 interface configuration for nve_loopbacks
+    - name: Validate NVE L3 Dict
+      debug: msg={{ underlay['nve_loopbacks_l3_v2'] }}
+      when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+
+    - name: Configure Layer 3 interface configuration for nve_loopbacks   <<<<<<<<<<<<< is this being skipped?
       nxos_l3_interfaces:
         config: "{{ underlay['nve_loopbacks_l3_v2'] }}" 
         state: merged
       when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
       tags:
       - loopbacks
+
+    - name: validate nve loopback
+      nxos_command:
+        commands: 
+        - show run interface {{ underlay['nve_loopbacks_l3_v2'][0]['name'] }} 
+      register: checksum1
+      when: inventory_hostname in groups.leaf or inventory_hostname in groups.bleaf or inventory_hostname in groups.bgw
+
+    - debug: var=checksum1
+
+##  << Need to consider migrating to with_subelements syntax here
+
+    - name: Validate P2P Interfaces L3 Dict
+      debug: msg={{ underlay['interfaces_l3_v2'] }}
 
     - name: Set Layer 3 interface configuration for p2p connections
       nxos_l3_interfaces:

@@ -1,17 +1,11 @@
 {% set nspace = namespace() %}
 {% set leafs = groups['leaf'] + groups['bleaf'] %}
 {% for id, peer in vpc_pairs.iteritems() %}
-{#
-   Note for future:  If there are any "undefined" variables errors 
-   showing up when executing the generate_vpc_variables.yml file,
-   always check to make sure that variables are being called
-   from the appropriate namespace (i.e., if variables are defined
-   locally, they cannot be called from a global context.)
-
+{# Remember we put this section in to debug the variables#}
 leafs: {{ leafs }} 
 id: {{ id }} peer: {{peer}}
 inventory_hostname: {{inventory_hostname}}
-#}
+{##}
 {%    if inventory_hostname in peer %}
 {%       if inventory_hostname in leafs %}
 {%          set vpcid = id %}
@@ -83,22 +77,8 @@ vpc:
       ipaddress_secondary: {{ vtep_anycast[vpcid]["ip"] }}
       mask: {{ vtep_anycast[vpcid]["mask"] }}
 {%       endif %}
-{#
-  Initially, these two stanzas below were defined out of the major for-loop
-  and thus the vpcid is unknown outside of the loop and a failure
-  resulted.
-#}
-  nve_loopbacks_v2:
-   - name: {{ underlay["nve_loopbacks_v2"][0]["name"] }}
-     enabled: true
-     description: NVE_Loopback
-  nve_loopbacks_l3_v2:
-    - name: {{ underlay["nve_loopbacks_v2"][0]["name"] }}
-      ipv4:
-        - address: {{ vtep_anycast[vpcid]["ip"] }}/{{ vtep_anycast[vpcid]["mask"] }}
-          secondary: True
-          tag: "{{ overlay['bgpparameters']['asn'] }}"
 {%    endif %}
 {% endfor %}
+
 
 
