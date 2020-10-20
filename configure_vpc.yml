@@ -160,6 +160,11 @@
           state: merged
         when: vpc.domain is defined
 
+
+####################################################################################
+#  Manually configure port channel in trunk mode
+####################################################################################
+
       - name: Manually configure port channel in trunk mode
         nxos_config:
           lines:
@@ -212,6 +217,18 @@
             that:
               - "'active' in checksum2.stdout[0]"
         rescue:
+##############################################################3
+##############################################################3
+  # vpc:
+  #   vpc_lag_interfaces:
+  #     - name: port-channel4096
+  #       members:
+  #         - member: Ethernet2/1
+  #           mode: active
+  #         - member: Ethernet2/2
+  #           mode: active
+##############################################################3
+##############################################################3
         - name: send default interface command to vpc lag members
           nxos_config:
             lines:
@@ -223,6 +240,11 @@
           nxos_config:
             lines:
             - no interface port-channel {{ vpc.po_id }}
+        - name: Bring up vPC Peer Link Interfaces
+          nxos_interfaces:
+            config: "{{ vpc['vpc_interfaces'] }}" 
+            state: replaced
+          when: vpc.domain is defined
         - name: Add vpc portchannel interface with nxos_lag_interfaces module
           nxos_lag_interfaces:
             config: "{{ vpc['vpc_lag_interfaces'] }}" 
@@ -235,6 +257,12 @@
                 mode: layer2
                 enabled: True
             state: merged
+        - name: Manually configure port channel in trunk mode
+          nxos_config:
+            lines:
+              - interface port-channel {{ vpc.po_id }}
+              - switchport mode trunk
+          when: vpc.domain is defined
         - name: Configure trunking on portchannel interface with nxos_l2_interfaces module
           nxos_l2_interfaces:
             config:

@@ -1,0 +1,2 @@
+ansible-playbook -i hosts-syd-pod10-1.0.yml configure_overlay.yml
+ansible-playbook -i hosts-syd-pod10-1.0.yml add_service.yml

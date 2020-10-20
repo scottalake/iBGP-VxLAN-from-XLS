@@ -13,8 +13,8 @@
 - import_playbook: configure_spine_features.yml
 - import_playbook: configure_underlay.yml
 # - import_playbook: configure_underlay_bgw.yml
-# - import_playbook: configure_vpc.yml
-# - import_playbook: configure_overlay.yml
+- import_playbook: configure_vpc.yml
+- import_playbook: configure_overlay.yml
 # - import_playbook: configure_overlay_bgw.yml
 # - import_playbook: save_and_backup_configuration.yml
 ...

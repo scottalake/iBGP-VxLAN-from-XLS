@@ -1,7 +1,7 @@
 ---
 - name: Configure overlay service
   hosts: [leaf,bleaf]
-  #connection: local
+  connection: local
   gather_facts: no
   roles:
     - common
@@ -99,91 +99,27 @@
         #   with_items: "{{ l2service['interfaces'] }}"
 # #########################################################################
 
-        # - name: Make sure the cited interfaces are L2 
-        #   nxos_interfaces:
-        #     config:
-        #       - name: "{{ item.name }}"
-        #         mode: layer2
-        #         enabled: True
-        #     state: merged
-        #   with_items: "{{ l2service['interfaces'] }}"
-
-        # - name:  Initialize ignore_image_list
-        #   set_fact:
-        #     show_run_commands: []
-
-        - block:
-          - name: Make sure the cited interfaces are L2 
-            nxos_interfaces:
-              config:
-                - name: "{{ item.name }}"
-                  mode: layer2
-                  enabled: True
-              state: merged
-            with_items: "{{ l2service['interfaces'] }}"
-
-          # - name: Display show run interface
-          #   debug: var=show_run_interface
-
-          # - name: Compile Show Run Commands
-          #   set_fact:
-          #     show_run_commands: "{{ show_run_commands|default([]) + [ show_run_interface ] }}"
-
-          # - name: Display show run commands
-          #   debug: var=show_run_commands
-
-############################################################################
-############################################################################
-        # - name: send show run interface to system
-        #   nxos_command:
-        #     commands: 
-        #       - show run interface {{ item.name }}
-        #   register: show_run_interface
-        #   #when: item.bndlid is defined
-        #   with_items: "{{ l2service['interfaces'] }}"
-
-        # - name: Display show run commands in subelements
-        #   debug:
-        #     msg="{{ item.1 }}"
-        #   with_subelements:
-        #     - "{{ show_run_interface.results }}"
-        #     - stdout
-        #   when: item.1 is defined
-
-############################################################################
-############################################################################
-
-        - name:  Add members to channel group
-          nxos_lag_interfaces:
+        - name: Make sure the cited interfaces are L2 
+          nxos_interfaces:
             config:
-              - name: "{{ item.bndlid }}"
-                members:
-                  - member: "{{ item.name }}"
-            state: replaced
-          when: item.bndlid is defined
+              - name: "{{ item.name }}"
+                mode: layer2
+                enabled: True
+            state: merged
           with_items: "{{ l2service['interfaces'] }}"
 
-
-############################################################################
-############################################################################
-        - name: send show run interface to system
+        - name: validate vpc interfaces member of port channel
           nxos_command:
             commands: 
-              - show run interface {{ item.name }}
+            - show run interface {{ item.name }}
           register: show_run_interface
           #when: item.bndlid is defined
           with_items: "{{ l2service['interfaces'] }}"
 
-        - name: Display show run commands in subelements
-          debug:
-            msg="{{ item.1 }}"
-          with_subelements:
-            - "{{ show_run_interface.results }}"
-            - stdout
-          when: item.1 is defined
-############################################################################
-############################################################################
-
+        - name: print show run interface to console
+          debug: "{{ item.stdout_lines }}"
+          with_items: "{{show_run_interface.results}}"
+          #when: item.stdout_lines is defined
 
 
 # #########################################################################
@@ -234,17 +170,6 @@
 # ##  The filtering ensures that port channel members are not configured 
 # ##  with unnecessay trunk mode commands.
 # #########################################################################
-
-        - name: Make sure the cited interfaces are L2 
-          nxos_interfaces:
-            config:
-              - name: "{{ item.name }}"
-                mtu: "{{ item.mtu }}"
-            state: merged
-          when:
-            - item.bndlid is not defined
-          with_items: "{{ l2service['interfaces'] }}"
-
         - name: Configure trunk interfaces not in port-channel group
           nxos_l2_interfaces:
             config:
@@ -285,7 +210,34 @@
 #             - item.bndlid is not defined
 #           with_items: "{{ l2service['interfaces'] }}"
 
+        - name: Make sure the cited interfaces are L2 
+          nxos_interfaces:
+            config:
+              - name: "{{ item.name }}"
+                mtu: "{{ item.mtu }}"
+            state: merged
+          when:
+            - item.bndlid is not defined
+          with_items: "{{ l2service['interfaces'] }}"
+
+
 # #########################################################################
+
+#         - name: Configure PO if needed
+#           nxos_linkagg:
+#             group: "{{ item.bndlid }}"
+#             mode: active
+#             members:
+#               - "{{ item.name }}"
+#             force: yes
+#           when: item.bndlid is defined
+#           with_items: "{{ l2service['interfaces'] }}"
+
+        # - name: Add vpc portchannel interface with nxos_lag_interfaces module
+        #   nxos_lag_interfaces:
+        #     config: "{{ vpc['vpc_lag_interfaces'] }}" 
+        #     state: merged
+        #   when: vpc.domain is defined
 
 ############################################################################
 
@@ -295,188 +247,211 @@
               - name: "{{ item.bndlid }}"
                 members:
                   - member: "{{ item.name }}"
-                    mode: active
             state: replaced
           when: item.bndlid is defined
           with_items: "{{ l2service['interfaces'] }}"
 
 ############################################################################
 ############################################################################
-        - name: send show run interface to system
+############################################################################
+
+        - name: validate vpc interfaces member of port channel
           nxos_command:
             commands: 
-              - show run interface {{ item.name }}
-          register: show_run_interface
-          #when: item.bndlid is defined
+            - show run interface {{ item.name }} | i  channel-group
+          register: channel_group
+          when: item.bndlid is defined
           with_items: "{{ l2service['interfaces'] }}"
 
-        - name: Display show run commands in subelements
+        - name: debug var channel_group.results
+          debug: var=channel_group.results
+
+        - name: debug var channel_group
+          debug: "{{ item.stdout_lines }}"
+          with_items: "{{channel_group.results}}"
+          when: item.stdout_lines is defined
+
+        # - set_fact: raw_prefix='mpath'
+        #   when: item.stdout|regex_search('mpath')
+        #   with_items: "{{w.results}}"
+        #   until: raw_prefix=='mpath'
+
+        #- debug: var=channel_group.results[0]['changed']
+        #- debug: var=channel_group.results[0]['stdout'[0]]
+        #- debug: var=channel_group.results[0]['stdout_lines'][0]
+        #- debug: var=channel_group.results[0]['stdout'][0]
+        #- debug: var=channel_group.stderr
+
+        # - debug:
+        #     msg: "{{ item.stdout[0] }}"
+        #   loop: "{{ channel_group.results }}"
+
+        # - debug:
+        #     msg: "{{ item.[stdout] }}"
+        #   loop: "{{ channel_group.results }}"
+
+        # - debug:
+        #     msg: "{{ item[stdout] }}"
+        #   loop: "{{ channel_group.results }}"
+
+        - name: debug item.stdout
           debug:
-            msg="{{ item.1 }}"
+            msg: "{{ item.stdout }}"
+          loop: "{{ channel_group.results }}"
+          when: item.stdout is defined
+
+        - name: debug item.stdout with subelements
+          debug:
+            msg: "Contents of stdout for {{ inventory_hostname }}, {{ item.0.item.name }} is {{ item.1 }}"
           with_subelements:
-            - "{{ show_run_interface.results }}"
+            - "{{ channel_group.results }}"
             - stdout
           when: item.1 is defined
-############################################################################
-############################################################################
 
-############################################################################
-############################################################################
-############################################################################
+        - assert:
+            that:
+              - item.1 | regex_search('.*active.*')
+              #- item.stdout_lines[0] | length > 0
+              #- item.stdout | length > 0
+          with_subelements:
+            - "{{ channel_group.results }}"
+            - stdout
+          when: item.1 is defined
 
-        - block:
-          - name: Begin block-> Check for channel-group commands
-            nxos_command:
-              commands: 
-              - show run interface {{ item.name }} | i  channel-group
-            register: channel_group
-            when: item.bndlid is defined
-            with_items: "{{ l2service['interfaces'] }}"
+        # - name: Check if log directory exists - Step 2
+        #   fail: msg="Log directory does not exists or it is not a symlink."
+        #   failed_when: >
+        #     item.stat.islnk is not defined
+        #     or item.stat.islnk != true
+        #     or item..stat.lnk_source != "{{ wl_base }}/logs/{{ wl_dom }}/{{ item.1 }}"
+        #   with_items: channel_group.results
 
-          - name: Print contents of stdout after running sh run int channel-group command
-            debug:
-              msg: "Contents of stdout for {{ inventory_hostname }}, {{ item.0.item.name }} is {{ item.1 }}"
-            with_subelements:
-              - "{{ channel_group.results }}"
-              - stdout
-            when: item.1 is defined
+        # - assert:
+        #     that:
+        #       #- item.stdout | regex_search(.*active.*)
+        #       - item.stdout_lines[0] | length > 0
+        #       #- item.stdout | length > 0
+        #   with_items: "{{ channel_group.results }}"
+        #   when: item.stdout is defined
 
-          - assert:
-              that:
-                - item.1 | regex_search('.*active.*')
-            with_subelements:
-              - "{{ channel_group.results }}"
-              - stdout
-            when: item.1 is defined
-############################################################################
-############################################################################
-          rescue:
-
-          - name: Manually configure port channel in trunk mode due to Ansible bug
-            nxos_config:
-              lines:
-                - channel-group {{ item.bndlid }} mode active
-              parents: "interface {{ item.name }}"
-            when: 
-              - item.bndlid is defined
-            with_items: "{{ l2service['interfaces'] }}"
-
-          # - name: Clear config on port channel members
-          #   nxos_config:
-          #     lines:
-          #       - default interface {{ item.name }} 
-          #   when: item.bndlid is defined
-          #   with_items: "{{ l2service['interfaces'] }}"
-
-############################################################################
-# May need this later
-############################################################################
-
-          # - name: send show run interface to system
-          #   nxos_command:
-          #     commands: 
-          #       - show run interface {{ item.name }}
-          #   register: show_run_interface
-          #   #when: item.bndlid is defined
-          #   with_items: "{{ l2service['interfaces'] }}"
-
-          # - name: Display show run commands in subelements
-          #   debug:
-          #     msg="{{ item.1 }}"
-          #   with_subelements:
-          #     - "{{ show_run_interface.results }}"
-          #     - stdout
-          #   when: item.1 is defined
-############################################################################
-############################################################################
-
-          # - name: Manually configure port channel in trunk mode due to Ansible bug
-          #   nxos_config:
-          #     lines:
-          #       - switchport mode trunk
-          #     parents: "interface {{ item.name }}"
-          #   when: 
-          #     - item.mode is defined and item.mode == "trunk"
-          #     - item.bndlid is not defined
-          #   with_items: "{{ l2service['interfaces'] }}"
+        # - assert:
+        #     that:
+        #       - item.stdout | regex_search(.*active.*)
+        #       #- item.stdout_lines[0] | length > 0
+        #       #- item.stdout | length > 0
+        #   with_subelements:
+        #     - "{{ channel_group.results }}"
+        #     - stdout
+        #   when: channel_group.results.stdout is defined
 
 
-          # - name: Delete port channel interface
-          #   nxos_config:
-          #     lines:
-          #       - no interface {{ item.name }} 
-          #   when: item.bndlid is not defined
-          #   with_items: "{{ l2service['interfaces'] }}"
 
-          # - name: Make sure the cited interfaces are L2 
-          #   nxos_interfaces:
-          #     config:
-          #       - name: "{{ item.name }}"
-          #         mode: layer2
-          #         enabled: True
-          #     state: merged
-          #   with_items: "{{ l2service['interfaces'] }}"
+# - debug:
+#     msg: "JBoss config {{ item.item }} does not contain the word vault"
+#   when: item.stdout.find('$VAULT') == -1
+#   with_items: '{{ vault_contents.results }}'
 
-          # - name: Replace device configuration of specified LAG attributes of given interfaces with provided configuration.
-          #   nxos_lag_interfaces:
-          #     config:
-          #       - name: "{{ item.bndlid }}"
-          #         members:
-          #           - member: "{{ item.name }}"
-          #             mode: active
-          #     state: replaced
-          #   when: item.bndlid is defined
-          #   with_items: "{{ l2service['interfaces'] }}"
+# - name: Install telegraf agent/collector (RedHat)
+#   yum:
+#     name: "{{ agent_collector }}"
+#     state: "installed"
+#   when: ( ansible_os_family == 'RedHat' and company_install_collector == true )
+#   register: result
+#   until: result.stdout.find("Installed:") != -1
+#   #The following works in CentOS/RedHat
+#   #until: result.rc == 0  
 
-          # - name: Manually configure port channel in trunk mode due to Ansible bug
-          #   nxos_config:
-          #     lines:
-          #       - switchport mode trunk
-          #     parents: "interface {{ item.name }}"
-          #   when: 
-          #     - item.mode is defined and item.mode == "trunk"
-          #     - item.bndlid is not defined
-          #   with_items: "{{ l2service['interfaces'] }}"
 
-          # - name: Configure trunk interfaces not in port-channel group
-          #   nxos_l2_interfaces:
-          #     config:
-          #       - name: "{{ item.name }}"
-          #         trunk:
-          #           allowed_vlans: "{{ item.vlanid }}"
-          #     state: merged
-          #   when: 
-          #     - item.mode is defined and item.mode == "trunk"
-          #     - item.bndlid is not defined
-          #   with_items: "{{ l2service['interfaces'] }}"
 
-          - name: Re-validate presence of channel group config on bundle members
-            nxos_command:
-              commands: 
-              - show run interface {{ item.name }} | i  channel-group
-            register: channel_group
-            when: item.bndlid is defined
-            with_items: "{{ l2service['interfaces'] }}"
+  # - name: Assert that namespaces have the correct Kiali roles
+  #   assert:
+  #     that: "{{ item.resources | length == 1 }}"
+  #   with_items:
+  #   - "{{ kiali_roles.results }}"
 
-          - name: Print outcome of show int {interface} | i channel-group
-            debug:
-              msg: "Contents of stdout for {{ inventory_hostname }}, {{ item.0.item.name }} is {{ item.1 }}"
-            with_subelements:
-              - "{{ channel_group.results }}"
-              - stdout
-            when: item.1 is defined
 
-          - assert:
-              that:
-                - item.1 | regex_search('.*active.*')
-              fail_msg: "channel-group commands still not sticking to member interfaces"
-              success_msg: "channel-group config successfully applied to {{ inventory_hostname }} {{ item.0.item.name }}"
-            with_subelements:
-              - "{{ channel_group.results }}"
-              - stdout
-            when: item.1 is defined
+        # - block:
+        #   - name: validate vpc interfaces member of port channel
+        #     nxos_command:
+        #       commands: 
+        #       - show run interface {{ item.name }}
+        #     register: results
+        #     when: item.bndlid is defined
+        #     with_items: "{{ l2service['interfaces'] }}"
 
-#########################################################################
+        #   - debug: var=results
+
+        #   - assert:
+        #       that:
+        #         - "'active' in checksum1.stdout[0]"
+
+        #   - name: validate vpc interfaces member of port channel
+        #     nxos_command:
+        #       commands: 
+        #       - show run interface {{ vpc['vpc_interfaces'][1]['name'] }} 
+        #     register: checksum2
+        #   - debug: var=checksum2
+        #   - assert:
+        #       that:
+        #         - "'active' in checksum2.stdout[0]"
+        #   rescue:
+        #   - name: send default interface command to vpc lag members
+        #     nxos_config:
+        #       lines:
+        #         - default interface {{ item.1.member }} 
+        #     with_subelements:
+        #       - "{{ vpc.vpc_lag_interfaces }}"
+        #       - members
+        #   - name: delete port channel interface
+        #     nxos_config:
+        #       lines:
+        #       - no interface port-channel {{ vpc.po_id }}
+        #   - name: Add vpc portchannel interface with nxos_lag_interfaces module
+        #     nxos_lag_interfaces:
+        #       config: "{{ vpc['vpc_lag_interfaces'] }}" 
+        #       state: merged
+        #   - name: Enable vpc port channel interface with nxos_interfaces module
+        #     nxos_interfaces:
+        #       config:
+        #         - name: "port-channel{{ vpc.po_id }}"
+        #           description: 'vPC_peer_link_to_{{ vpc.vpc_peer }}'
+        #           mode: layer2
+        #           enabled: True
+        #       state: merged
+        #   - name: Configure trunking on portchannel interface with nxos_l2_interfaces module
+        #     nxos_l2_interfaces:
+        #       config:
+        #         - name: "port-channel{{ vpc.po_id }}"
+        #           trunk:
+        #             allowed_vlans: 1-200
+        #       state: merged
+        #   - name: Configure peer link on VPC Port Channel interface with nxos_vpc_interface module
+        #     nxos_vpc_interface:
+        #       portchannel: "{{ vpc.po_id }}"
+        #       peer_link: yes
+        #       state: present
+        #   - name: validate port channel configuration present on FIRST port channel member interface
+        #     nxos_command:
+        #       commands: 
+        #       - show run interface {{ vpc['vpc_interfaces'][0]['name'] }} 
+        #     register: checksum1
+        #   - assert:
+        #       that:
+        #         - " 'active' in checksum1.stdout[0]"
+        #       fail_msg: "port channel still has a problem sticking to vpc member interfaces"
+        #       success_msg: "port channel configuration on {{ vpc['vpc_interfaces'][0]['name'] }}"
+        #   - name: validate port channel configuration present on SECOND port channel member interface
+        #     nxos_command:
+        #       commands: 
+        #       - show run interface {{ vpc['vpc_interfaces'][1]['name'] }} 
+        #     register: checksum2
+        #   - assert:
+        #       that:
+        #         - " 'active' in checksum2.stdout[0]"
+        #       fail_msg: "port channel still has a problem sticking to vpc member interfaces"
+        #       success_msg: "port channel configuration on {{ vpc['vpc_interfaces'][0]['name'] }}"
+
+
 
 
 

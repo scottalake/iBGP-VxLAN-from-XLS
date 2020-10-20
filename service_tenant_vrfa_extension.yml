@@ -1,3 +1,4 @@
+#Maybe use this to add ports to a previously configured vtep node.
 services:
   - { vlanid: 100, service: l2l3vni, mtu: 9216, vrfname: VRFA, l3vnivlan: 10, gwipaddress: "192.168.123.254/24" }
 bgp_address_families:
