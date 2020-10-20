@@ -1,7 +1,7 @@
 ---
 - name: Configure Underlay
   hosts: [leaf,bleaf,bgw,spine]
-  connection: local
+  #connection: local
   gather_facts: no
   roles:
     - common
