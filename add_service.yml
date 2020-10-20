@@ -159,6 +159,7 @@
               - name: "{{ item.bndlid }}"
                 members:
                   - member: "{{ item.name }}"
+                    mode: active
             state: replaced
           when: item.bndlid is defined
           with_items: "{{ l2service['interfaces'] }}"
