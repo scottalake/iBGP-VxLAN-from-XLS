@@ -1,0 +1,137 @@
+
+
+conf t
+no hostname
+no fabric forwarding anycast-gateway-mac aaaa.aaaa.aaaa
+no ip pim rp-address 10.200.200.200 group-list 233.1.0.0/24
+no ip pim ssm range 232.0.0.0/8
+no vlan 10,100
+no route-map RMAP-REDIST-DIRECT
+no route-map RMAP-REDIST-STATIC
+no vpc domain 10
+no interface nve1
+no interface po 1
+no interface po 100
+no interface po 111
+no interface po 4096
+default interface e1/1-36
+!
+!
+default interface e2/1-32
+!
+!
+default interface e3/1-52
+!
+no router ospf underlay
+no router bgp 65100
+no interface loop 0
+no interface loop 1
+
+
+
+interface port-channel1
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 100
+  vpc 1
+
+
+  switchport mode trunk
+  switchport trunk allowed vlan 1-200
+
+no interface port-channel1
+interface port-channel1
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 100
+  vpc 1
+
+interface e1/36,e2/32,e3/51
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 100
+  mtu 9216
+  channel 1 mode active
+
+interface port-channel1
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 100
+  vpc 1
+
+interface e1/36,e2/32,e3/51
+  switchport
+  switchport mode trunk
+  switchport trunk allowed vlan 100
+  mtu 9216
+  channel 1 mode active
+
+
+interface e1/36,e2/32,e3/51
+ no channel 1
+ channel 1 force
+
+
+interface e1/36,e2/32,e3/51
+shutdown
+exit
+no interface nve1
+interface nve1
+  no shutdown
+  description NVE Interface Configured by Ansible
+  host-reachability protocol bgp
+  advertise virtual-rmac
+  source-interface loopback1
+  source-interface hold-down-time 60
+interface e1/36,e2/32,e3/51
+no shutdown
+
+
+
+system no poap
+show boot
+show system poap
+
+loader> boot bootflash:nxos.9.3.5.bin
+stop poap boot?
+
+
+
+no password strength-check
+username admin password 5 $5$3Qu0BqWq$ENnZ2qRhzG.ZRDxZceWDEwMBHFlOsuSNdYrcfIk1A8A  role network-admin
+no ip domain-lookup
+
+
+############################################
+N9k1
+vrf context management
+  ip route 0.0.0.0/0 10.66.94.209
+  ip route 10.66.79.90/32 10.66.94.209
+
+interface mgmt0
+  vrf member management
+  ip address 10.66.94.215/28
+
+############################################
+N9k2
+vrf context management
+  ip route 0.0.0.0/0 10.66.94.209
+  ip route 10.66.79.90/32 10.66.94.209
+
+interface mgmt0
+  vrf member management
+  ip address 10.66.94.216/28
+
+############################################
+
+
+interface mgmt0
+  vrf member management
+  ip address 10.66.94.216/28
+icam monitor scale
+
+
+
+
+
+
