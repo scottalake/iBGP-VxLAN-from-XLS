@@ -103,7 +103,8 @@ no ip domain-lookup
 
 
 ############################################
-N9k1
+host N9k1
+no ip domain-lookup
 vrf context management
   ip route 0.0.0.0/0 10.66.94.209
   ip route 10.66.79.90/32 10.66.94.209
